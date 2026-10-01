@@ -29,6 +29,7 @@ import { setupRouter } from './routes/setup.js';
 import { cliRouter } from './routes/cli.js';
 import { cliKeyRouter } from './routes/cliKey.js';
 import { mcpRouter } from './routes/mcp.js';
+import { memoryRouter } from './routes/memory.js';
 import { UPLOAD_ROOT } from './lib/upload.js';
 import { getPublicBrandSettings, isSystemInitialized } from './lib/systemSettings.js';
 import { HttpError } from './lib/asyncHandler.js';
@@ -109,6 +110,7 @@ export function createApp() {
   app.use('/api/users', usersRouter);
   app.use('/api/workspaces', workspaceRouter);
   app.use('/api/docs', docRouter);
+  app.use('/api/memory', memoryRouter);
   app.use('/api/todos', todoRouter);
   app.use('/api/tables', tableRouter);
   app.use('/api/fonts', fontRouter);

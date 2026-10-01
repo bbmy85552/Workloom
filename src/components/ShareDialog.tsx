@@ -9,12 +9,26 @@ import type { Collaborator, ShareLink, UserSearchItem } from '../lib/types';
 interface ShareDialogProps {
   open: boolean;
   onClose: () => void;
-  resourceType: 'doc' | 'table';
+  resourceType: 'doc' | 'table' | 'memory';
   resourceId: string;
   canManage: boolean;
 }
 
+function collaboratorBase(resourceType: ShareDialogProps['resourceType'], resourceId: string) {
+  if (resourceType === 'doc') return `/docs/${resourceId}/collaborators`;
+  if (resourceType === 'memory') return `/memory/projects/${resourceId}/collaborators`;
+  return `/tables/${resourceId}/collaborators`;
+}
+
+const RESOURCE_LABEL: Record<ShareDialogProps['resourceType'], string> = {
+  doc: '文档',
+  table: '表格',
+  memory: '项目记忆',
+};
+
 export function ShareDialog({ open, onClose, resourceType, resourceId, canManage }: ShareDialogProps) {
+  // 项目记忆只支持协作者，不支持公开分享链接
+  const supportsLinks = resourceType !== 'memory';
   const showToast = useUiStore((s) => s.showToast);
   const confirmDialog = useUiStore((s) => s.confirmDialog);
   const alertDialog = useUiStore((s) => s.alertDialog);
@@ -27,13 +41,10 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const collabPath =
-        resourceType === 'doc'
-          ? `/docs/${resourceId}/collaborators`
-          : `/tables/${resourceId}/collaborators`;
+      const collabPath = collaboratorBase(resourceType, resourceId);
       const [collabRes, linksRes] = await Promise.all([
         api.get<{ owner: UserSearchItem; collaborators: Collaborator[] }>(collabPath),
-        canManage
+        canManage && supportsLinks
           ? api.get<{ list: ShareLink[] }>('/share', { params: { resourceType, resourceId } })
           : Promise.resolve({ data: { list: [] } }),
       ]);
@@ -45,7 +56,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
     } finally {
       setLoading(false);
     }
-  }, [canManage, resourceId, resourceType, showToast]);
+  }, [canManage, resourceId, resourceType, showToast, supportsLinks]);
 
   useEffect(() => {
     if (open) void loadAll();
@@ -53,10 +64,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
 
   const addCollaborator = async (user: UserSearchItem) => {
     try {
-      const path =
-        resourceType === 'doc'
-          ? `/docs/${resourceId}/collaborators`
-          : `/tables/${resourceId}/collaborators`;
+      const path = collaboratorBase(resourceType, resourceId);
       const { data } = await api.post<{ collaborator: Collaborator }>(path, {
         userId: user.id,
         role: 'VIEWER',
@@ -70,10 +78,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
 
   const updateRole = async (userId: string, role: 'VIEWER' | 'EDITOR') => {
     try {
-      const path =
-        resourceType === 'doc'
-          ? `/docs/${resourceId}/collaborators/${userId}`
-          : `/tables/${resourceId}/collaborators/${userId}`;
+      const path = `${collaboratorBase(resourceType, resourceId)}/${userId}`;
       const { data } = await api.patch<{ collaborator: Collaborator }>(path, { role });
       setCollaborators((arr) => arr.map((c) => (c.user.id === userId ? data.collaborator : c)));
     } catch (err) {
@@ -90,10 +95,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
     });
     if (!ok) return;
     try {
-      const path =
-        resourceType === 'doc'
-          ? `/docs/${resourceId}/collaborators/${userId}`
-          : `/tables/${resourceId}/collaborators/${userId}`;
+      const path = `${collaboratorBase(resourceType, resourceId)}/${userId}`;
       await api.delete(path);
       setCollaborators((arr) => arr.filter((c) => c.user.id !== userId));
     } catch (err) {
@@ -148,7 +150,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   const excludeIds = [owner?.id, ...collaborators.map((c) => c.user.id)].filter(Boolean) as string[];
 
   return (
-    <Modal open={open} onClose={onClose} title={`分享与协作（${resourceType === 'doc' ? '文档' : '表格'}）`} size="lg">
+    <Modal open={open} onClose={onClose} title={`分享与协作（${RESOURCE_LABEL[resourceType]}）`} size="lg">
       {loading && <div className="text-sm text-text-secondary">加载中…</div>}
       {owner && (
         <section className="mb-6">
@@ -211,7 +213,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
         )}
       </section>
 
-      {canManage && (
+      {canManage && supportsLinks && (
         <section>
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">

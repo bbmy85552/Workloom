@@ -43,6 +43,10 @@ model User {
   tableForms      TableFormView[]
   sessions        Session[]
   apiKey          ApiKey?
+  memoryProjects  MemoryProject[] @relation("MemoryProjectCreator")
+  memoryProjectPermissions MemoryProjectPermission[]
+  memoryItemsCreated MemoryItem[] @relation("MemoryItemCreator")
+  memoryItemsUpdated MemoryItem[] @relation("MemoryItemUpdater")
 }
 
 model Session {
@@ -103,6 +107,7 @@ model Workspace {
   owner     User       @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   documents Document[]
   tables    TableBase[]
+  memoryProjects MemoryProject[]
   createdAt DateTime   @default(now())
 
   @@index([kind])
@@ -486,4 +491,56 @@ model MailMessage {
 
   @@unique([accountId, folder, uid])
   @@index([accountId, receivedAt])
+}
+
+model MemoryProject {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdById String
+  createdBy   User      @relation("MemoryProjectCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  deletedAt   DateTime?
+  permissions MemoryProjectPermission[]
+  items       MemoryItem[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, deletedAt])
+  @@index([createdById])
+}
+
+model MemoryProjectPermission {
+  id        String        @id @default(cuid())
+  projectId String
+  project   MemoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  createdAt DateTime      @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model MemoryItem {
+  id          String        @id @default(cuid())
+  projectId   String
+  project     MemoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        String        @default("note")
+  title       String?
+  content     String
+  pinned      Boolean       @default(true)
+  tags        String        @default("[]")
+  source      String?
+  createdById String
+  createdBy   User          @relation("MemoryItemCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedById String?
+  updatedBy   User?         @relation("MemoryItemUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([projectId, deletedAt, pinned, updatedAt])
 }

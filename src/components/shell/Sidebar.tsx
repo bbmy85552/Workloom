@@ -14,6 +14,7 @@ import {
   BriefcaseBusiness,
   PanelLeftClose,
   PanelLeftOpen,
+  Brain,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/app/dashboard', label: '工作台', icon: LayoutGrid },
   { to: '/app/docs', label: '知识库', icon: BookOpen },
   { to: '/app/tables', label: '数据表', icon: Table },
+  { to: '/app/memory', label: '项目记忆', icon: Brain },
   { to: '/app/calendar', label: '日历', icon: Calendar },
   { to: '/app/mail', label: '邮箱', icon: Mail },
   { to: '/app/recent', label: '最近', icon: Clock },

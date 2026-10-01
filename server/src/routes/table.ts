@@ -217,6 +217,16 @@ function assertWrite(ctx: { canWrite: boolean }) {
   if (!ctx.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
 }
 
+async function assertRecordInTable(tableId: string, recordId: string) {
+  const record = await prisma.tableRecord.findFirst({ where: { id: recordId, tableId }, select: { id: true } });
+  if (!record) throw new HttpError(404, '记录不存在', 'RECORD_NOT_FOUND');
+}
+
+async function assertFieldInTable(tableId: string, fieldId: string) {
+  const field = await prisma.tableField.findFirst({ where: { id: fieldId, tableId }, select: { id: true } });
+  if (!field) throw new HttpError(404, '字段不存在', 'FIELD_NOT_FOUND');
+}
+
 tableRouter.get(
   '/templates',
   asyncHandler(async (_req, res) => {
@@ -472,6 +482,7 @@ tableRouter.patch(
         options: z.any().optional(),
       })
       .parse(req.body);
+    await assertFieldInTable(ctx.table.id, req.params.fieldId);
     const field = await prisma.tableField.update({
       where: { id: req.params.fieldId },
       data: {
@@ -488,6 +499,7 @@ tableRouter.delete(
   asyncHandler(async (req, res) => {
     const ctx = await loadTable(req.user!.id, req.params.id);
     assertWrite(ctx);
+    await assertFieldInTable(ctx.table.id, req.params.fieldId);
     await prisma.tableField.delete({ where: { id: req.params.fieldId } });
     res.json({ ok: true });
   }),
@@ -517,6 +529,7 @@ tableRouter.patch(
     const ctx = await loadTable(req.user!.id, req.params.id);
     assertWrite(ctx);
     const body = z.object({ data: z.record(z.any()) }).parse(req.body);
+    await assertRecordInTable(ctx.table.id, req.params.recordId);
     const record = await prisma.tableRecord.update({
       where: { id: req.params.recordId },
       data: { dataJson: JSON.stringify(body.data) },
@@ -530,6 +543,7 @@ tableRouter.delete(
   asyncHandler(async (req, res) => {
     const ctx = await loadTable(req.user!.id, req.params.id);
     assertWrite(ctx);
+    await assertRecordInTable(ctx.table.id, req.params.recordId);
     await prisma.tableRecord.delete({ where: { id: req.params.recordId } });
     res.json({ ok: true });
   }),
