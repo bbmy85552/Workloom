@@ -6,10 +6,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
-import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
 import Image from '@tiptap/extension-image';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
@@ -23,6 +20,8 @@ import { FontFamily } from './FontFamily';
 import { LineHeight } from './LineHeight';
 import { FindReplacePanel } from './FindReplacePanel';
 import { EditorToolbar, type EditorToolbarHandlers } from './Toolbar';
+import { DocumentTable, DocumentTableCell, DocumentTableHeader } from './TableExtensions';
+import { looksLikeMarkdown, markdownToHtml } from './markdownPaste';
 
 interface Props {
   initialContent: string;
@@ -30,6 +29,7 @@ interface Props {
   fontFamilies: string[];
   editable?: boolean;
   handlers?: EditorToolbarHandlers;
+  onPasteImages?: (files: File[]) => void | Promise<void>;
   onHeadingsChange?: (headings: EditorHeading[]) => void;
 }
 
@@ -72,11 +72,23 @@ function readHeadings(editor: TiptapEditor | null): EditorHeading[] {
 }
 
 export const RichEditor = forwardRef<RichEditorRef, Props>(function RichEditor(
-  { initialContent, onChange, fontFamilies, editable = true, handlers, onHeadingsChange },
+  {
+    initialContent,
+    onChange,
+    fontFamilies,
+    editable = true,
+    handlers,
+    onPasteImages,
+    onHeadingsChange,
+  },
   ref,
 ) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onPasteImagesRef = useRef(onPasteImages);
+  onPasteImagesRef.current = onPasteImages;
+  const editableRef = useRef(editable);
+  editableRef.current = editable;
   const onHeadingsChangeRef = useRef(onHeadingsChange);
   onHeadingsChangeRef.current = onHeadingsChange;
 
@@ -107,10 +119,10 @@ export const RichEditor = forwardRef<RichEditorRef, Props>(function RichEditor(
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank' } }),
-      Table.configure({ resizable: true }),
+      DocumentTable.configure({ resizable: true }),
       TableRow,
-      TableHeader,
-      TableCell,
+      DocumentTableHeader,
+      DocumentTableCell,
       Image.configure({ inline: false, allowBase64: false, HTMLAttributes: { class: 'doc-image' } }),
       TaskList.configure({ HTMLAttributes: { class: 'doc-tasklist' } }),
       TaskItem.configure({ nested: true, HTMLAttributes: { class: 'doc-taskitem' } }),
@@ -133,6 +145,37 @@ export const RichEditor = forwardRef<RichEditorRef, Props>(function RichEditor(
         characters: editor.storage.characterCount?.characters() ?? 0,
         words: editor.storage.characterCount?.words() ?? 0,
       });
+    },
+    editorProps: {
+      handlePaste: (_view, event) => {
+        if (!editableRef.current || !event.clipboardData) {
+          return false;
+        }
+        const itemFiles = Array.from(event.clipboardData.items)
+          .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+          .flatMap((item) => {
+            const file = item.getAsFile();
+            return file ? [file] : [];
+          });
+        const files =
+          itemFiles.length > 0
+            ? itemFiles
+            : Array.from(event.clipboardData.files).filter((file) =>
+                file.type.startsWith('image/'),
+              );
+        if (files.length > 0 && onPasteImagesRef.current) {
+          event.preventDefault();
+          void onPasteImagesRef.current(files);
+          return true;
+        }
+
+        const text = event.clipboardData.getData('text/plain');
+        if (!looksLikeMarkdown(text)) return false;
+
+        event.preventDefault();
+        editor?.chain().focus().insertContent(markdownToHtml(text)).run();
+        return true;
+      },
     },
   });
   const [counts, setCounts] = useState({ characters: 0, words: 0 });

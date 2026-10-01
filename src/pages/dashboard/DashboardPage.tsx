@@ -5,14 +5,22 @@ import { api, asApiError } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
 import type { TodoItem, TodoProgress, DashboardSummary } from '../../lib/types';
+import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
 
 function toISODate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function isSameDay(a: string | null, b: string) {
   if (!a) return false;
-  return a.slice(0, 10) === b;
+  // Prefer exact YYYY-MM-DD prefix; also accept local calendar day of an ISO timestamp
+  if (a.slice(0, 10) === b) return true;
+  const d = new Date(a);
+  if (Number.isNaN(d.getTime())) return false;
+  return toISODate(d) === b;
 }
 
 export function DashboardPage() {
@@ -28,6 +36,7 @@ export function DashboardPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState(toISODate(new Date()));
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [brandName, setBrandName] = useState(DEFAULT_PUBLIC_SETTINGS.brandName);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -65,6 +74,9 @@ export function DashboardPage() {
   useEffect(() => {
     void loadToday();
     void loadSummary();
+    void fetchPublicSettings()
+      .then((settings) => setBrandName(settings.brandName))
+      .catch(() => undefined);
   }, [loadToday, loadSummary]);
 
   useEffect(() => {
@@ -77,9 +89,13 @@ export function DashboardPage() {
     try {
       await api.post('/todos', { title, dueDate: newDate });
       setNewTitle('');
+      setSelectedDate(newDate);
       void loadToday();
-      void loadDay(selectedDate);
-      showToast('已添加待办', 'success');
+      void loadDay(newDate);
+      showToast(
+        newDate === toISODate(new Date()) ? '已添加到今日待办' : `已添加待办（截止日期 ${newDate}）`,
+        'success',
+      );
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
@@ -119,7 +135,7 @@ export function DashboardPage() {
     <div className="animate-fade-in-up py-6 sm:py-8">
       <header className="mb-8">
         <h1 className="text-3xl sm:text-[40px] font-serif font-bold text-text-primary tracking-tight mb-2">
-          欢迎回来，{user?.name ?? '简记用户'}
+          欢迎回来，{user?.name ?? `${brandName}用户`}
         </h1>
         <p className="text-text-secondary">今天是 {today}，把重要的事情先完成吧。</p>
       </header>
@@ -177,8 +193,11 @@ export function DashboardPage() {
       </section>
 
       <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold font-serif">今日待办</h2>
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <h2 className="text-xl font-bold font-serif">今日待办</h2>
+            <span className="text-xs text-text-secondary">含今天到期与逾期未完成</span>
+          </div>
           {!isToday && (
             <button
               onClick={() => setSelectedDate(today)}
@@ -210,11 +229,11 @@ export function DashboardPage() {
           moreTo="/app/calendar"
         />
         <SummaryCard
-          title="即将到期"
+          title="即将到期 / 逾期"
           icon={Clock}
-          empty="7 天内没有截止待办"
+          empty="近期没有截止待办"
           items={
-            summary?.upcomingTodos.slice(0, 4).map((t) => ({
+            summary?.upcomingTodos.slice(0, 8).map((t) => ({
               key: t.id,
               title: t.title,
               sub: t.dueDate ? t.dueDate.slice(0, 10) : '',

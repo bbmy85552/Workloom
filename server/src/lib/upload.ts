@@ -44,7 +44,22 @@ function makeStorage(subdir: string) {
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+export async function storeUploadBuffer(
+  buffer: Buffer,
+  options: { subdir: string; originalName: string },
+) {
+  const dir = path.join(UPLOAD_ROOT, options.subdir, yearMonth());
+  await fs.promises.mkdir(dir, { recursive: true });
+  const filename = `${Date.now()}_${nanoid(10)}${safeExt(options.originalName)}`;
+  const absPath = path.join(dir, filename);
+  await fs.promises.writeFile(absPath, buffer);
+  return {
+    absPath,
+    storedName: storedRelative(absPath),
+  };
+}
 
 export const uploadAny = multer({
   storage: makeStorage('attachments'),
@@ -77,19 +92,20 @@ export const uploadAvatar = multer({
 });
 
 const DOC_IMPORT_REGEX =
-  /(application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/(markdown|plain)|application\/(octet-stream|msword))/i;
+  /(application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|octet-stream|msword|pdf)|text\/(markdown|plain))/i;
 
 export const uploadDocImport = multer({
   storage: makeStorage('imports'),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 },
   fileFilter: (_req, file, cb) => {
+    const originalName = normalizeFilename(file.originalname);
     if (
       DOC_IMPORT_REGEX.test(file.mimetype) ||
-      /\.(docx|md|markdown|txt)$/i.test(file.originalname)
+      /\.(docx|md|markdown|txt|pdf)$/i.test(originalName)
     ) {
       cb(null, true);
     } else {
-      cb(new Error('仅支持 .docx / .md / .txt 文件'));
+      cb(new Error('仅支持 .docx / .md / .markdown / .txt / .pdf 文件'));
     }
   },
 });

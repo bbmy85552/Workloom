@@ -14,6 +14,7 @@ export function AppShell() {
   const setSidebar = useUiStore((s) => s.setSidebar);
   const location = useLocation();
   const isMailPage = location.pathname.startsWith('/app/mail');
+  const isOaPage = location.pathname.startsWith('/app/oa');
 
   useEffect(() => {
     let alive = true;
@@ -65,10 +66,10 @@ export function AppShell() {
         <Header />
         <main
           className={`flex-1 min-h-0 px-4 sm:px-6 lg:px-10 pb-12 pt-2 sm:pt-4 w-full ${
-            isMailPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'
+            isMailPage || isOaPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'
           }`}
         >
-          <div className={`w-full ${isMailPage ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+          <div className={`w-full ${isMailPage || isOaPage ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
             <Outlet />
           </div>
         </main>

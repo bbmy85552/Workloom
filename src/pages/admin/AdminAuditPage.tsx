@@ -10,6 +10,8 @@ const ACTION_LABEL: Record<string, string> = {
   CREATE_USER: '创建用户',
   DELETE_USER: '删除用户',
   UPDATE_SETTINGS: '更新系统设置',
+  RESTORE_DOC: '恢复文档',
+  PURGE_DOC: '彻底删除文档',
 };
 
 export function AdminAuditPage() {

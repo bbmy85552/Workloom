@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Copy,
   GanttChartSquare,
+  Sparkles,
 } from 'lucide-react';
 import { api, asApiError, downloadFromApi, uploadFile } from '../../lib/api';
 import { useUiStore } from '../../store/ui';
@@ -67,6 +68,7 @@ export function TableDetailPage() {
   const [fields, setFields] = useState<TableField[]>([]);
   const [records, setRecords] = useState<TableRecord[]>([]);
   const [view, setView] = useState<ViewKind>('table');
+  const [autoFitTable, setAutoFitTable] = useState(false);
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
   const [filterField, setFilterField] = useState<string | null>(null);
@@ -87,6 +89,7 @@ export function TableDetailPage() {
   const [newFormRequired, setNewFormRequired] = useState<Set<string>>(new Set());
   const uploadResolverRef = useRef<((att: Attachment | null) => void) | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const uploadBusyRef = useRef(false);
   const canWrite = role === 'OWNER' || role === 'EDITOR';
 
   const load = useCallback(async () => {
@@ -109,6 +112,7 @@ export function TableDetailPage() {
   }, [id, navigate, showToast]);
 
   const requestUpload = useCallback((): Promise<Attachment | null> => {
+    if (uploadBusyRef.current) return Promise.resolve(null);
     return new Promise((resolve) => {
       uploadResolverRef.current = resolve;
       uploadInputRef.current?.click();
@@ -118,10 +122,15 @@ export function TableDetailPage() {
   const onUploadFile = async (file: File | undefined) => {
     const resolver = uploadResolverRef.current;
     uploadResolverRef.current = null;
+    if (uploadBusyRef.current) {
+      resolver?.(null);
+      return;
+    }
     if (!file || !id) {
       resolver?.(null);
       return;
     }
+    uploadBusyRef.current = true;
     try {
       const data = await uploadFile<{ attachment: Attachment }>(
         '/attachments/upload',
@@ -132,6 +141,8 @@ export function TableDetailPage() {
     } catch (err) {
       showToast(asApiError(err).error, 'error');
       resolver?.(null);
+    } finally {
+      uploadBusyRef.current = false;
     }
   };
 
@@ -759,6 +770,21 @@ export function TableDetailPage() {
                 {sortAsc ? '升序' : '降序'}
               </button>
             )}
+            {view === 'table' && (
+              <button
+                onClick={() => {
+                  setAutoFitTable((v) => !v);
+                  showToast(autoFitTable ? '已恢复默认表格宽度' : '已自动排版表格', 'success');
+                }}
+                className={`h-8 px-3 text-sm rounded-lg border inline-flex items-center gap-1.5 transition-colors ${
+                  autoFitTable
+                    ? 'border-liquid-indigo/30 bg-liquid-indigo/10 text-liquid-indigo'
+                    : 'border-black/10 bg-white text-text-secondary hover:bg-black/5'
+                }`}
+              >
+                <Sparkles size={14} /> 自动排版
+              </button>
+            )}
           </div>
         </div>
 
@@ -845,6 +871,7 @@ export function TableDetailPage() {
             onRemoveField={removeField}
             canWrite={canWrite}
             requestUpload={requestUpload}
+            autoFit={autoFitTable}
           />
         )}
         {view === 'kanban' && (
@@ -1178,6 +1205,7 @@ function TableView({
   onRemoveField,
   canWrite,
   requestUpload,
+  autoFit,
 }: {
   fields: TableField[];
   records: TableRecord[];
@@ -1187,15 +1215,39 @@ function TableView({
   onRemoveField: (fieldId: string) => void;
   canWrite: boolean;
   requestUpload: () => Promise<Attachment | null>;
+  autoFit: boolean;
 }) {
+  const columnWidths = useMemo(
+    () => (autoFit ? getAutoColumnWidths(fields, records) : []),
+    [autoFit, fields, records],
+  );
+  const tableMinWidth = autoFit
+    ? columnWidths.reduce((sum, width) => sum + width, 88)
+    : undefined;
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse text-sm">
+      <table
+        className={`border-collapse text-sm ${autoFit ? '' : 'min-w-full'}`}
+        style={autoFit ? { minWidth: tableMinWidth } : undefined}
+      >
+        {autoFit && (
+          <colgroup>
+            {fields.map((f, index) => (
+              <col key={f.id} style={{ width: columnWidths[index] }} />
+            ))}
+            <col style={{ width: 88 }} />
+          </colgroup>
+        )}
         <thead>
-          <tr className="text-left text-text-secondary border-b border-black/5">
-            {fields.map((f) => (
-              <th key={f.id} className="px-3 py-2 font-medium whitespace-nowrap group">
-                <div className="flex items-center gap-2">
+          <tr className="text-text-secondary border-b border-black/5">
+            {fields.map((f, index) => (
+              <th
+                key={f.id}
+                className="px-3 py-2 font-medium whitespace-nowrap group text-center"
+                style={autoFit ? { width: columnWidths[index] } : undefined}
+              >
+                <div className="flex items-center justify-center gap-2">
                   {f.name}
                   <span className="text-[10px] uppercase tracking-wider text-text-secondary/70">
                     {f.type}
@@ -1228,9 +1280,13 @@ function TableView({
           )}
           {records.map((r) => (
             <tr key={r.id} className="h-12 border-b border-black/5 hover:bg-black/[0.02] group">
-              {fields.map((f) => (
-                <td key={f.id} className="h-12 px-3 py-1.5 align-middle">
-                  <div className="flex h-8 max-h-8 items-center overflow-hidden">
+              {fields.map((f, index) => (
+                <td
+                  key={f.id}
+                  className="h-12 px-3 py-1.5 align-middle text-left"
+                  style={autoFit ? { width: columnWidths[index] } : undefined}
+                >
+                  <div className="flex h-8 max-h-8 items-center justify-start overflow-hidden">
                     {f.type === 'formula' ? (
                       <FormulaCell field={f} record={r} fields={fields} records={records} />
                     ) : (
@@ -1245,7 +1301,7 @@ function TableView({
                   </div>
                 </td>
               ))}
-              <td className="h-12 px-3 py-1.5 align-middle">
+              <td className="h-12 px-3 py-1.5 align-middle text-left">
                 <div className="flex h-8 items-center gap-1">
                   {canWrite && (
                     <>
@@ -1273,6 +1329,66 @@ function TableView({
       </table>
     </div>
   );
+}
+
+function getAutoColumnWidths(fields: TableField[], records: TableRecord[]): number[] {
+  return fields.map((field) => {
+    const headerWidth = measureTextWidth(`${field.name} ${field.type}`) + 64;
+    const contentWidth = records.reduce((max, record) => {
+      const display = getCellDisplayValue(field, record, fields, records);
+      return Math.max(max, measureTextWidth(display) + 40);
+    }, headerWidth);
+    return Math.min(Math.max(contentWidth, getMinColumnWidth(field)), getMaxColumnWidth(field));
+  });
+}
+
+function getMinColumnWidth(field: TableField): number {
+  if (field.type === 'checkbox') return 96;
+  if (field.type === 'number' || field.type === 'rating' || field.type === 'progress') return 112;
+  if (field.type === 'date') return 140;
+  if (field.type === 'datetime') return 190;
+  if (field.type === 'attachment') return 180;
+  return 140;
+}
+
+function getMaxColumnWidth(field: TableField): number {
+  if (field.type === 'longtext') return 420;
+  if (field.type === 'attachment' || field.type === 'multiselect') return 360;
+  return 320;
+}
+
+function measureTextWidth(text: string): number {
+  return Array.from(text).reduce((sum, char) => {
+    if (char.charCodeAt(0) <= 0x7f) return sum + 7;
+    return sum + 14;
+  }, 0);
+}
+
+function getCellDisplayValue(
+  field: TableField,
+  record: TableRecord,
+  fields: TableField[],
+  records: TableRecord[],
+): string {
+  if (field.type === 'formula') {
+    const expression = (field.options?.formula as string) || '';
+    if (!expression) return '';
+    const result = evalFormula(expression, {
+      fields: fields.map((f) => ({ id: f.id, name: f.name, type: f.type })),
+      current: record.data,
+      records: records.map((r) => r.data),
+    });
+    return result.error ? '#错误' : formatFormulaValue(result.value);
+  }
+
+  const value = record.data[field.name];
+  if (field.type === 'attachment') {
+    const list = Array.isArray(value) ? (value as Attachment[]) : [];
+    return list.map((a) => displayFilename(a.originalName)).join(', ');
+  }
+  if (field.type === 'checkbox') return value ? '已勾选' : '';
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(', ');
+  return value == null ? '' : String(value);
 }
 
 function CellEditor({

@@ -43,7 +43,10 @@ export const env = {
   MAIL_SECURE: toBool(process.env.MAIL_SECURE, true),
   MAIL_USER: process.env.MAIL_USER ?? '',
   MAIL_PASS: process.env.MAIL_PASS ?? '',
-  MAIL_FROM: process.env.MAIL_FROM ?? '简记 <no-reply@jianji.local>',
+  MAIL_FROM: process.env.MAIL_FROM ?? '文档中心 <no-reply@jianji.local>',
+
+  GOOGLE_CLIENT_ID:
+    process.env.GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '',
 
   CODE_TTL_SECONDS: toInt(process.env.CODE_TTL_SECONDS, 600),
   CODE_RESEND_INTERVAL_SECONDS: toInt(process.env.CODE_RESEND_INTERVAL_SECONDS, 60),

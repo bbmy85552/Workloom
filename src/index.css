@@ -59,6 +59,36 @@ body,
   height: 100%;
 }
 
+/* ----- 文档内联颜色：按亮度归类，跨主题自适应 -----
+   外部粘贴的内容常带 <font>/<span style="color:...">，颜色是为特定背景设计的，
+   切换主题后隐形。清洗脚本按 WCAG 亮度给元素标 data-doc-fg-tone / data-doc-bg-tone：
+     light  = 浅色（仅深底可见）
+     dark   = 深色（仅浅底可见）
+   这里在“错误主题”下用 !important 覆盖内联 style，换成该主题下可读的色值。 */
+.rich-editor [data-doc-fg-tone='light'],
+.doc-print-area [data-doc-fg-tone='light'] {
+  /* 浅色字在浅色主题下换成深色字 */
+}
+html:not([data-theme='dark']) .rich-editor [data-doc-fg-tone='light'],
+html:not([data-theme='dark']) .doc-print-area [data-doc-fg-tone='light'] {
+  color: var(--color-text-primary) !important;
+}
+html[data-theme='dark'] .rich-editor [data-doc-fg-tone='dark'],
+html[data-theme='dark'] .doc-print-area [data-doc-fg-tone='dark'] {
+  /* 深色字在深色主题下换成浅色字 */
+  color: var(--color-text-primary) !important;
+}
+/* 浅色背景（深底专用）在浅色主题下会成刺眼色块，压暗成中性表面 */
+html:not([data-theme='dark']) .rich-editor [data-doc-bg-tone='light'],
+html:not([data-theme='dark']) .doc-print-area [data-doc-bg-tone='light'] {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+/* 深色背景（浅底专用）在深色主题下太黑，提亮成半透明 */
+html[data-theme='dark'] .rich-editor [data-doc-bg-tone='dark'],
+html[data-theme='dark'] .doc-print-area [data-doc-bg-tone='dark'] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
 html[data-theme='dark'] {
   --color-surface: #0f1117;
   --color-surface-dim: #090b10;
@@ -97,6 +127,8 @@ html[data-theme='dark'] textarea::placeholder {
 }
 
 html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-white\/70,
+html[data-theme='dark'] .bg-white\/75,
 html[data-theme='dark'] .bg-white\/80,
 html[data-theme='dark'] .bg-white\/90 {
   background-color: var(--color-surface-container-lowest) !important;
@@ -121,6 +153,24 @@ html[data-theme='dark'] .border-black\/15 {
 html[data-theme='dark'] .divide-black\/5 > :not([hidden]) ~ :not([hidden]) {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
+
+/* ----- 文件夹配色 / 徽章色：深色主题下改用半透明背景 + 浅色文字（覆盖浅色档 -100/-700） ----- */
+html[data-theme='dark'] .bg-sky-100 { background-color: rgba(56, 189, 248, 0.16) !important; }
+html[data-theme='dark'] .text-sky-700 { color: #7dd3fc !important; }
+html[data-theme='dark'] .bg-blue-100 { background-color: rgba(59, 130, 246, 0.16) !important; }
+html[data-theme='dark'] .text-blue-700 { color: #60a5fa !important; }
+html[data-theme='dark'] .border-blue-200 { border-color: #60a5fa !important; }
+html[data-theme='dark'] .bg-emerald-100 { background-color: rgba(52, 211, 153, 0.16) !important; }
+html[data-theme='dark'] .text-emerald-700 { color: #6ee7b7 !important; }
+html[data-theme='dark'] .bg-amber-100 { background-color: rgba(251, 191, 36, 0.16) !important; }
+html[data-theme='dark'] .text-amber-700 { color: #fcd34d !important; }
+html[data-theme='dark'] .bg-rose-100 { background-color: rgba(251, 113, 133, 0.16) !important; }
+html[data-theme='dark'] .text-rose-700 { color: #fda4af !important; }
+html[data-theme='dark'] .bg-violet-100 { background-color: rgba(167, 139, 250, 0.16) !important; }
+html[data-theme='dark'] .text-violet-700 { color: #c4b5fd !important; }
+/* 已解决评论的高亮（emerald-50/emerald-100）在深色下也跟随上方的半透明规则 */
+html[data-theme='dark'] .bg-emerald-50\/40 { background-color: rgba(52, 211, 153, 0.14) !important; }
+html[data-theme='dark'] .border-emerald-100 { border-color: rgba(52, 211, 153, 0.28) !important; }
 
 /* ----- TipTap / ProseMirror styles ----- */
 .rich-editor .ProseMirror img,
@@ -228,6 +278,11 @@ html[data-theme='dark'] .divide-black\/5 > :not([hidden]) ~ :not([hidden]) {
   width: 100%;
   margin: 1em 0;
   overflow: hidden;
+}
+.rich-editor .ProseMirror table[data-auto-fit='true'] {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
 }
 .rich-editor .ProseMirror th,
 .rich-editor .ProseMirror td {

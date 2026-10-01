@@ -6,6 +6,7 @@ import { ensureSeed } from '../src/seed.js';
 import { __testCodeMap } from '../src/lib/verifyCode.js';
 
 let appInstance: Express | null = null;
+export const TEST_INVITE_CODE = 'test-invite';
 
 export async function getApp() {
   if (!appInstance) {
@@ -17,6 +18,7 @@ export async function getApp() {
 
 export async function resetData() {
   __testCodeMap.clear();
+  await prisma.apiKey.deleteMany({});
   await prisma.session.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.shareLink.deleteMany({});
@@ -59,12 +61,17 @@ export function readCode(email: string, purpose: string) {
 
 export async function registerUser(email: string, name = 'Tester', password = 'Aa12345678') {
   const app = await getApp();
-  await request(app).post('/api/auth/register-code').send({ email });
+  await prisma.systemSetting.upsert({
+    where: { key: 'register_invite_code' },
+    update: { value: TEST_INVITE_CODE },
+    create: { key: 'register_invite_code', value: TEST_INVITE_CODE },
+  });
+  await request(app).post('/api/auth/register-code').send({ email, inviteCode: TEST_INVITE_CODE });
   const code = readCode(email, 'register');
   if (!code) throw new Error('test code not captured');
   const res = await request(app)
     .post('/api/auth/register')
-    .send({ email, code, password, name });
+    .send({ email, code, password, name, inviteCode: TEST_INVITE_CODE });
   return { res, cookie: res.headers['set-cookie'] as unknown as string[], password };
 }
 

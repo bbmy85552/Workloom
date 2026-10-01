@@ -14,6 +14,19 @@ export interface DocAccess {
 
 export async function loadDoc(docId: string) {
   const doc = await prisma.document.findUnique({
+    where: { id: docId, deletedAt: null },
+    include: { workspace: true, permissions: true },
+  });
+  if (!doc) throw new HttpError(404, '文档不存在', 'DOC_NOT_FOUND');
+  return doc;
+}
+
+/**
+ * 加载文档（含已软删除的）。仅用于 admin 回收站管理。
+ * 普通访问应使用 loadDoc，它会过滤掉软删除的文档。
+ */
+export async function loadDocIncludeDeleted(docId: string) {
+  const doc = await prisma.document.findUnique({
     where: { id: docId },
     include: { workspace: true, permissions: true },
   });

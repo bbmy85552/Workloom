@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 const items = [
   { to: '/app/settings/profile', label: '个人资料' },
   { to: '/app/settings/security', label: '密码与邮箱' },
+  { to: '/app/settings/cli', label: 'AI 与 CLI' },
   { to: '/app/settings/preferences', label: '偏好设置' },
   { to: '/app/settings/fonts', label: '字体管理' },
 ];

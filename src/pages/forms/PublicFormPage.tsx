@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, asApiError } from '../../lib/api';
 import type { PublicFormDetail } from '../../lib/types';
+import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
 
 interface ChoiceOption {
   label: string;
@@ -33,13 +34,19 @@ export function PublicFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [brandName, setBrandName] = useState(DEFAULT_PUBLIC_SETTINGS.brandName);
 
   useEffect(() => {
     if (!token) return;
     void (async () => {
       try {
-        const { data } = await api.get<{ form: PublicFormDetail }>(`/public/forms/${token}`);
+        const [formRes, settings] = await Promise.all([
+          api.get<{ form: PublicFormDetail }>(`/public/forms/${token}`),
+          fetchPublicSettings().catch(() => DEFAULT_PUBLIC_SETTINGS),
+        ]);
+        const { data } = formRes;
         setForm(data.form);
+        setBrandName(settings.brandName);
       } catch (err) {
         setError(asApiError(err).error);
       } finally {
@@ -66,7 +73,7 @@ export function PublicFormPage() {
     <div className="min-h-screen bg-surface flex items-start justify-center py-10 px-4">
       <div className="w-full max-w-xl">
         <div className="text-center mb-6">
-          <div className="text-2xl font-serif font-bold text-text-primary">简记 · 公开表单</div>
+          <div className="text-2xl font-serif font-bold text-text-primary">{brandName} · 公开表单</div>
           <div className="text-xs text-text-secondary mt-1">由表单创建者邀请你填写</div>
         </div>
 

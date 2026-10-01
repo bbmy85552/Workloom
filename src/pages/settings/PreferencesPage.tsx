@@ -125,7 +125,7 @@ export function PreferencesPage() {
               ? '自动保存失败，请稍后重试'
               : '修改后会自动保存，无需手动点击保存。'}
       </div>
-      <section className="rounded-2xl p-5 space-y-4 border border-black/5">
+      <section className="rounded-2xl p-5 space-y-4 border border-black/5 bg-surface-container-lowest">
         <h3 className="text-sm font-semibold text-text-primary">外观</h3>
         <Field label="主题">
           <select
@@ -205,7 +205,7 @@ export function PreferencesPage() {
         </Field>
       </section>
 
-      <section className="rounded-2xl p-5 space-y-4 border border-black/5">
+      <section className="rounded-2xl p-5 space-y-4 border border-black/5 bg-surface-container-lowest">
         <h3 className="text-sm font-semibold text-text-primary">默认</h3>
         <Field label="登录后默认进入">
           <select
@@ -223,7 +223,7 @@ export function PreferencesPage() {
         </Field>
       </section>
 
-      <section className="rounded-2xl p-5 space-y-4 border border-black/5">
+      <section className="rounded-2xl p-5 space-y-4 border border-black/5 bg-surface-container-lowest">
         <h3 className="text-sm font-semibold text-text-primary">编辑器</h3>
         <Field label="默认字体">
           <input
@@ -258,7 +258,7 @@ export function PreferencesPage() {
         </Field>
       </section>
 
-      <section className="rounded-2xl p-5 space-y-4 border border-black/5">
+      <section className="rounded-2xl p-5 space-y-4 border border-black/5 bg-surface-container-lowest">
         <h3 className="text-sm font-semibold text-text-primary">通知</h3>
         <Toggle
           label="站内通知"

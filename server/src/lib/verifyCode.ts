@@ -4,6 +4,7 @@ import { generateNumericCode, sha256 } from './hash.js';
 import { renderCodeMail, sendMail } from './mail.js';
 import { countInWindow, lastInWindow, recordEvent } from './rateLimit.js';
 import { HttpError } from './asyncHandler.js';
+import { getMailBrandName } from './systemSettings.js';
 
 export type VerifyPurpose =
   | 'register'
@@ -86,7 +87,8 @@ export async function requestVerificationCode({ email, purpose, ip }: RequestCod
     __testCodeMap.set(`${normalizedEmail}:${purpose}`, code);
   }
 
-  const mail = renderCodeMail(code, purpose);
+  const brandName = await getMailBrandName();
+  const mail = renderCodeMail(code, purpose, brandName);
   try {
     await sendMail({ to: normalizedEmail, ...mail });
   } catch {

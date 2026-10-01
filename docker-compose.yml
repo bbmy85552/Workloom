@@ -11,6 +11,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
+      TZ: Asia/Hong_Kong
       APP_URL: ${APP_URL:?please set APP_URL}
       DATABASE_URL: ${DATABASE_URL:-file:/app/data/dev.db}
       JWT_SECRET: ${JWT_SECRET:?please set JWT_SECRET to a long random value}
@@ -27,7 +28,8 @@ services:
       MAIL_SECURE: ${MAIL_SECURE:-true}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASS: ${MAIL_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-简记 <no-reply@example.com>}
+      MAIL_FROM: ${MAIL_FROM:-文档中心 <no-reply@example.com>}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
       ALLOW_PUBLIC_REGISTER: ${ALLOW_PUBLIC_REGISTER:-true}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       JIANJI_LATEST_VERSION: ${JIANJI_LATEST_VERSION:-}

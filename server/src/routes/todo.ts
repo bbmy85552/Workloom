@@ -23,6 +23,18 @@ function parseDate(s: string, label: string) {
   if (Number.isNaN(d.getTime())) throw new HttpError(400, `${label} 时间格式无效`, 'INVALID');
   return d;
 }
+/** Parse YYYY-MM-DD as a calendar day in the server local TZ (set TZ=Asia/Hong_Kong). */
+function parseDateOnlyBounds(s: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+  if (!m) throw new HttpError(400, '日期格式无效', 'INVALID');
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const start = new Date(y, mo, d, 0, 0, 0, 0);
+  const end = new Date(y, mo, d, 23, 59, 59, 999);
+  if (Number.isNaN(start.getTime())) throw new HttpError(400, '日期格式无效', 'INVALID');
+  return { start, end, noon: new Date(y, mo, d, 12, 0, 0, 0) };
+}
 
 todoRouter.get(
   '/',
@@ -32,9 +44,11 @@ todoRouter.get(
       .parse(req.query);
     const where: any = { userId: req.user!.id };
     if (q.date) {
-      const d = new Date(q.date);
-      if (!Number.isNaN(d.getTime())) {
-        where.dueDate = { gte: startOfDay(d), lte: endOfDay(d) };
+      try {
+        const { start, end } = parseDateOnlyBounds(q.date);
+        where.dueDate = { gte: start, lte: end };
+      } catch {
+        /* ignore invalid date filter */
       }
     }
     const list = await prisma.todoItem.findMany({
@@ -49,11 +63,17 @@ todoRouter.get(
   '/today',
   asyncHandler(async (req, res) => {
     const now = new Date();
+    const dayStart = startOfDay(now);
+    const dayEnd = endOfDay(now);
     const list = await prisma.todoItem.findMany({
       where: {
         userId: req.user!.id,
         OR: [
-          { dueDate: { gte: startOfDay(now), lte: endOfDay(now) } },
+          // 今天到期（含已完成）
+          { dueDate: { gte: dayStart, lte: dayEnd } },
+          // 逾期未完成
+          { dueDate: { lt: dayStart }, completedAt: null },
+          // 无截止日期且未完成
           { dueDate: null, completedAt: null },
         ],
       },
@@ -81,11 +101,20 @@ todoRouter.post(
         dueDate: z.string().nullable().optional(),
       })
       .parse(req.body);
+    let dueDate: Date | null = null;
+    if (body.dueDate) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(body.dueDate.trim())) {
+        dueDate = parseDateOnlyBounds(body.dueDate).noon;
+      } else {
+        dueDate = new Date(body.dueDate);
+        if (Number.isNaN(dueDate.getTime())) throw new HttpError(400, '日期格式无效', 'INVALID');
+      }
+    }
     const todo = await prisma.todoItem.create({
       data: {
         userId: req.user!.id,
         title: body.title,
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        dueDate,
       },
     });
     res.json({ todo });
@@ -110,7 +139,14 @@ todoRouter.patch(
       where: { id },
       data: {
         title: body.title,
-        dueDate: body.dueDate === undefined ? undefined : body.dueDate ? new Date(body.dueDate) : null,
+        dueDate:
+          body.dueDate === undefined
+            ? undefined
+            : body.dueDate === null || body.dueDate === ''
+              ? null
+              : /^\d{4}-\d{2}-\d{2}$/.test(body.dueDate.trim())
+                ? parseDateOnlyBounds(body.dueDate).noon
+                : new Date(body.dueDate),
         completedAt:
           body.completed === undefined
             ? undefined

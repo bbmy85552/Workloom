@@ -11,12 +11,15 @@ export function AdminSettingsPage() {
     allow_public_register: 'true',
     default_workspace_name: '我的空间',
     max_upload_mb: '25',
-    brand_name: '简记',
+    brand_name: '文档中心',
+    company_name: '文档中心',
+    oa_url: 'https://2dqy-oa.2dqy.com/calendar',
+    register_invite_code: '',
   });
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [saving, setSaving] = useState(false);
   const [testTo, setTestTo] = useState('');
-  const [testSubject, setTestSubject] = useState('[简记] 测试邮件');
+  const [testSubject, setTestSubject] = useState('');
   const [testing, setTesting] = useState(false);
   const [testInfo, setTestInfo] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -226,6 +229,40 @@ export function AdminSettingsPage() {
           />
         </SettingRow>
         <SettingRow
+          label="公司名"
+          hint="显示在侧边栏品牌名称下方"
+        >
+          <input
+            value={settings.company_name}
+            onChange={(e) => setSettings((s) => ({ ...s, company_name: e.target.value }))}
+            placeholder="例如：某某科技"
+            className="w-full h-9 px-2 text-sm rounded-md border border-black/10 bg-white"
+          />
+        </SettingRow>
+        <SettingRow
+          label="注册邀请码"
+          hint="新用户必须填写正确邀请码才能注册"
+        >
+          <input
+            value={settings.register_invite_code}
+            onChange={(e) => setSettings((s) => ({ ...s, register_invite_code: e.target.value }))}
+            placeholder="设置后发给需要注册的成员"
+            className="w-full h-9 px-2 text-sm rounded-md border border-black/10 bg-white"
+          />
+        </SettingRow>
+        <SettingRow
+          label="OA 地址"
+          hint="侧边栏 OA 页面 iframe 加载的 URL"
+        >
+          <input
+            type="url"
+            value={settings.oa_url}
+            onChange={(e) => setSettings((s) => ({ ...s, oa_url: e.target.value }))}
+            placeholder="https://2dqy-oa.2dqy.com/calendar"
+            className="w-full h-9 px-2 text-sm rounded-md border border-black/10 bg-white"
+          />
+        </SettingRow>
+        <SettingRow
           label="默认工作区名称"
           hint="新用户注册或被创建时自动生成的工作区名"
         >
@@ -305,10 +342,10 @@ export function AdminSettingsPage() {
             setTesting(true);
             setTestInfo(null);
             try {
-              const { data } = await api.post<{ ok: boolean; transport: string }>(
-                '/admin/mail/test',
-                { to: testTo, subject: testSubject },
-              );
+              const payload = testSubject.trim()
+                ? { to: testTo, subject: testSubject.trim() }
+                : { to: testTo };
+              const { data } = await api.post<{ ok: boolean; transport: string }>('/admin/mail/test', payload);
               setTestInfo(
                 data.transport === 'smtp'
                   ? `已通过 SMTP 发送到 ${testTo}`

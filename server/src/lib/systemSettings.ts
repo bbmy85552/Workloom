@@ -8,6 +8,10 @@ export const SYSTEM_SETTING_KEYS = {
   appUrl: 'app_url',
   allowPublicRegister: 'allow_public_register',
   defaultWorkspaceName: 'default_workspace_name',
+  brandName: 'brand_name',
+  companyName: 'company_name',
+  oaUrl: 'oa_url',
+  registerInviteCode: 'register_invite_code',
   mailEnabled: 'mail_enabled',
   mailHost: 'mail_host',
   mailPort: 'mail_port',
@@ -58,6 +62,34 @@ export async function isPublicRegisterAllowed() {
   });
   if (!setting) return env.ALLOW_PUBLIC_REGISTER;
   return toBool(setting.value, env.ALLOW_PUBLIC_REGISTER);
+}
+
+export async function verifyRegisterInviteCode(inviteCode: string) {
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: SYSTEM_SETTING_KEYS.registerInviteCode },
+  });
+  const expected = setting?.value.trim();
+  if (!expected) return false;
+  return inviteCode.trim() === expected;
+}
+
+export async function getPublicBrandSettings() {
+  const map = await getSystemSettingMap();
+  return {
+    brandName: map[SYSTEM_SETTING_KEYS.brandName]?.trim() || '文档中心',
+    companyName: map[SYSTEM_SETTING_KEYS.companyName]?.trim() || '文档中心',
+    oaUrl: map[SYSTEM_SETTING_KEYS.oaUrl]?.trim() || 'https://2dqy-oa.2dqy.com/calendar',
+    googleClientId: env.GOOGLE_CLIENT_ID,
+  };
+}
+
+export async function getMailBrandName() {
+  const map = await getSystemSettingMap();
+  return (
+    map[SYSTEM_SETTING_KEYS.companyName]?.trim() ||
+    map[SYSTEM_SETTING_KEYS.brandName]?.trim() ||
+    '文档中心'
+  );
 }
 
 export async function getRuntimeMailConfig(): Promise<RuntimeMailConfig | null> {

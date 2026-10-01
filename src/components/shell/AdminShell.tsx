@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Shield, Users, History, LogOut, UsersRound, Settings } from 'lucide-react';
+import { ChevronLeft, Shield, Users, History, LogOut, UsersRound, Settings, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { Toast } from './Toast';
 import { api } from '../../lib/api';
@@ -12,6 +12,7 @@ const items = [
   { to: '/admin/users', label: '用户管理', icon: Users },
   { to: '/admin/groups', label: '用户组', icon: UsersRound },
   { to: '/admin/settings', label: '系统设置', icon: Settings },
+  { to: '/admin/trash', label: '回收站', icon: Trash2 },
   { to: '/admin/audit', label: '审计日志', icon: History },
 ];
 

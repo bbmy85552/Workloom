@@ -14,7 +14,7 @@ dashboardRouter.get(
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfDay = new Date(startOfDay.getTime() + 24 * 3600 * 1000);
-    const in7Days = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
+    const in30Days = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
     const [todayEvents, upcomingTodos, recentDocs, unreadNotif, favoriteDocs] =
       await Promise.all([
@@ -30,14 +30,15 @@ dashboardRouter.get(
           where: {
             userId,
             completedAt: null,
-            dueDate: { gte: startOfDay, lt: in7Days },
+            dueDate: { not: null, lt: in30Days },
           },
           orderBy: { dueDate: 'asc' },
-          take: 8,
+          take: 20,
         }),
         prisma.document.findMany({
           where: {
             isArchived: false,
+            deletedAt: null,
             OR: [
               { createdById: userId },
               { permissions: { some: { userId } } },
@@ -54,7 +55,7 @@ dashboardRouter.get(
         }),
         prisma.notification.count({ where: { userId, readAt: null } }),
         prisma.documentFavorite.findMany({
-          where: { userId },
+          where: { userId, document: { isArchived: false, deletedAt: null } },
           orderBy: { createdAt: 'desc' },
           take: 5,
           include: {

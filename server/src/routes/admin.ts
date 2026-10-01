@@ -7,6 +7,7 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { hashPassword, generateNumericCode } from '../lib/hash.js';
 import { sendMail } from '../lib/mail.js';
+import { getMailBrandName } from '../lib/systemSettings.js';
 import { createBackupPayload, createMigrationPayload, restoreBackupPayload, restoreMigrationPayload } from '../lib/backup.js';
 import { contentDispositionAttachment } from '../lib/filename.js';
 import { env } from '../env.js';
@@ -26,7 +27,8 @@ adminRouter.post(
         text: z.string().max(4000).optional(),
       })
       .parse(req.body);
-    const subject = body.subject || '[简记] 测试邮件';
+    const brandName = await getMailBrandName();
+    const subject = body.subject || `[${brandName}] 测试邮件`;
     const text =
       body.text ||
       '这是一封测试邮件，用于校验系统 SMTP 配置是否可用。\n\n如果你收到这封邮件，说明配置正确。';
@@ -125,7 +127,7 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     const target = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!target) throw new HttpError(404, '用户不存在', 'NOT_FOUND');
-    const newPassword = `Jianji@${generateNumericCode(8)}`;
+    const newPassword = `Docs@${generateNumericCode(8)}`;
     await prisma.user.update({
       where: { id: target.id },
       data: { passwordHash: await hashPassword(newPassword) },
@@ -157,7 +159,7 @@ adminRouter.post(
     const email = body.email.toLowerCase();
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) throw new HttpError(409, '该邮箱已注册', 'EMAIL_TAKEN');
-    const password = body.password ?? `Jianji@${generateNumericCode(8)}`;
+    const password = body.password ?? `Docs@${generateNumericCode(8)}`;
     const user = await prisma.user.create({
       data: {
         email,
@@ -291,7 +293,10 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   allow_public_register: 'true',
   default_workspace_name: '我的空间',
   max_upload_mb: '25',
-  brand_name: '简记',
+  brand_name: '文档中心',
+  company_name: '文档中心',
+  oa_url: 'https://2dqy-oa.2dqy.com/calendar',
+  register_invite_code: '',
   latest_version: '',
 };
 
@@ -399,12 +404,13 @@ async function broadcastMaintenanceNotification(input: {
   });
   let emails = 0;
   let emailErrors = 0;
+  const brandName = await getMailBrandName();
   for (const u of users) {
     try {
       await sendMail({
         to: u.email,
-        subject: `[简记] ${input.title}`,
-        text: `${input.body}\n\n此邮件由简记系统维护通知自动发送。`,
+        subject: `[${brandName}] ${input.title}`,
+        text: `${input.body}\n\n此邮件由${brandName}系统维护通知自动发送。`,
       });
       emails += 1;
     } catch (err) {
@@ -445,7 +451,14 @@ adminRouter.put(
         actorId: req.user!.id,
         action: 'UPDATE_SETTINGS',
         target: 'system',
-        metaJson: JSON.stringify(Object.fromEntries(entries)),
+        metaJson: JSON.stringify(
+          Object.fromEntries(
+            entries.map(([key, value]) => [
+              key,
+              key === 'register_invite_code' && value ? '[REDACTED]' : value,
+            ]),
+          ),
+        ),
       },
     });
     res.json({ ok: true });
@@ -658,5 +671,123 @@ adminRouter.get(
       }),
     ]);
     res.json({ list, total, page: q.page, pageSize: q.pageSize });
+  }),
+);
+
+// ----- 回收站：公共知识库文档软删除恢复与彻底清理 -----
+
+const TRASH_RETAIN_DAYS = 30;
+
+adminRouter.get(
+  '/trash',
+  asyncHandler(async (req, res) => {
+    const q = z
+      .object({
+        page: z.coerce.number().int().min(1).default(1),
+        pageSize: z.coerce.number().int().min(1).max(100).default(20),
+      })
+      .parse(req.query);
+    // 惰性清理：超过保留期的软删除文档彻底删除
+    const expireBefore = new Date(Date.now() - TRASH_RETAIN_DAYS * 24 * 60 * 60 * 1000);
+    await prisma.document.deleteMany({ where: { deletedAt: { lt: expireBefore } } });
+
+    const [total, list] = await Promise.all([
+      prisma.document.count({ where: { deletedAt: { not: null } } }),
+      prisma.document.findMany({
+        where: { deletedAt: { not: null } },
+        orderBy: { deletedAt: 'desc' },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        select: {
+          id: true,
+          title: true,
+          workspaceId: true,
+          parentId: true,
+          deletedAt: true,
+          workspace: { select: { id: true, name: true, kind: true } },
+          deletedBy: { select: { id: true, email: true, name: true } },
+          createdBy: { select: { id: true, email: true, name: true } },
+        },
+      }),
+    ]);
+    const items = list.map((d) => ({
+      ...d,
+      remainDays: d.deletedAt
+        ? Math.max(
+            0,
+            Math.ceil(
+              (d.deletedAt.getTime() + TRASH_RETAIN_DAYS * 24 * 60 * 60 * 1000 - Date.now()) /
+                (24 * 60 * 60 * 1000),
+            ),
+          )
+        : 0,
+    }));
+    res.json({ list: items, total, page: q.page, pageSize: q.pageSize });
+  }),
+);
+
+adminRouter.post(
+  '/trash/:id/restore',
+  asyncHandler(async (req, res) => {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, parentId: true, deletedAt: true },
+    });
+    if (!doc || !doc.deletedAt) throw new HttpError(404, '回收站中无此文档', 'NOT_FOUND');
+
+    // 恢复整条父链：若父文件夹也被软删，一并恢复，避免恢复后变成孤儿
+    let cursor = doc.parentId;
+    const parentChain: string[] = [];
+    const visited = new Set<string>();
+    while (cursor && !visited.has(cursor)) {
+      visited.add(cursor);
+      const parent = await prisma.document.findUnique({
+        where: { id: cursor },
+        select: { id: true, parentId: true, deletedAt: true },
+      });
+      if (!parent) break;
+      if (parent.deletedAt) parentChain.push(parent.id);
+      cursor = parent.parentId;
+    }
+    if (parentChain.length) {
+      await prisma.document.updateMany({
+        where: { id: { in: parentChain } },
+        data: { deletedAt: null, deletedById: null },
+      });
+    }
+    const restored = await prisma.document.update({
+      where: { id: doc.id },
+      data: { deletedAt: null, deletedById: null },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'RESTORE_DOC',
+        target: doc.id,
+        metaJson: JSON.stringify({ title: doc.title }),
+      },
+    });
+    res.json({ doc: restored, restoredParents: parentChain.length });
+  }),
+);
+
+adminRouter.delete(
+  '/trash/:id',
+  asyncHandler(async (req, res) => {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, deletedAt: true },
+    });
+    if (!doc || !doc.deletedAt) throw new HttpError(404, '回收站中无此文档', 'NOT_FOUND');
+    await prisma.document.delete({ where: { id: doc.id } });
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'PURGE_DOC',
+        target: doc.id,
+        metaJson: JSON.stringify({ title: doc.title }),
+      },
+    });
+    res.json({ ok: true });
   }),
 );

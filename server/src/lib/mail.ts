@@ -65,7 +65,7 @@ export async function sendMail(payload: MailPayload) {
   return { ok: true, transport: 'smtp' as const };
 }
 
-export function renderCodeMail(code: string, purpose: string) {
+export function renderCodeMail(code: string, purpose: string, brandName = '文档中心') {
   const purposeLabel: Record<string, string> = {
     register: '注册账号',
     bind_email: '绑定邮箱',
@@ -74,7 +74,7 @@ export function renderCodeMail(code: string, purpose: string) {
   };
   const label = purposeLabel[purpose] ?? '邮箱验证';
   return {
-    subject: `[简记] ${label}验证码：${code}`,
+    subject: `[${brandName}] ${label}验证码：${code}`,
     text: `您好，您的验证码为 ${code}，用于${label}，10 分钟内有效。如非本人操作请忽略。`,
     html: `
       <div style="font-family: -apple-system, system-ui, sans-serif; line-height:1.6;">

@@ -22,6 +22,7 @@ model User {
 
   workspaces      Workspace[] @relation("WorkspaceOwner")
   documents       Document[]  @relation("DocCreator")
+  deletedDocs     Document[]  @relation("DeletedBy")
   permissions     DocumentPermission[]
   tablePermissions TablePermission[]
   todos           TodoItem[]
@@ -41,6 +42,7 @@ model User {
   favoriteDocs    DocumentFavorite[]
   tableForms      TableFormView[]
   sessions        Session[]
+  apiKey          ApiKey?
 }
 
 model Session {
@@ -56,6 +58,19 @@ model Session {
   createdAt   DateTime  @default(now())
 
   @@index([userId, revokedAt])
+}
+
+model ApiKey {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyHash       String    @unique
+  keyPrefix     String
+  lastUsedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  regeneratedAt DateTime?
+
+  @@index([keyPrefix])
 }
 
 model EmailVerificationCode {
@@ -105,6 +120,9 @@ model Document {
   isArchived    Boolean  @default(false)
   createdById   String
   createdBy     User     @relation("DocCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  deletedAt     DateTime?
+  deletedById   String?
+  deletedBy     User?     @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
   permissions   DocumentPermission[]
   versions      DocumentVersion[]
   comments      DocumentComment[]

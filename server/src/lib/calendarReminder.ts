@@ -1,6 +1,7 @@
 import { prisma } from '../prisma.js';
 import { expandCalendarEvents } from './calendarRepeat.js';
 import { createNotification } from './notify.js';
+import { getMailBrandName } from './systemSettings.js';
 
 let timer: NodeJS.Timeout | null = null;
 
@@ -18,6 +19,7 @@ async function tick() {
     take: 500,
     include: { user: { select: { id: true, email: true, name: true } } },
   });
+  const brandName = await getMailBrandName();
   for (const ev of expandCalendarEvents(events, lower, scanTo)) {
     if (ev.reminderMinutes == null) continue;
     const remindAt = new Date(ev.startAt.getTime() - ev.reminderMinutes * 60_000);
@@ -36,7 +38,7 @@ async function tick() {
       meta: { eventId: ev.id },
       emailFallback: {
         to: ev.user.email,
-        subject: `[简记] 日程提醒：${ev.title}`,
+        subject: `[${brandName}] 日程提醒：${ev.title}`,
         text: `${ev.title}\n开始时间：${new Date(ev.startAt).toLocaleString('zh-CN')}${ev.location ? '\n地点：' + ev.location : ''}${ev.description ? '\n\n' + ev.description : ''}`,
       },
     });

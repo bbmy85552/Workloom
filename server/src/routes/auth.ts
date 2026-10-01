@@ -10,7 +10,8 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { consumeVerificationCode, requestVerificationCode } from '../lib/verifyCode.js';
 import { requireAuth } from '../middleware/auth.js';
 import { hashSessionToken, revokeSessionByToken } from '../lib/session.js';
-import { isPublicRegisterAllowed } from '../lib/systemSettings.js';
+import { isPublicRegisterAllowed, verifyRegisterInviteCode } from '../lib/systemSettings.js';
+import { verifyGoogleCredential } from '../lib/googleAuth.js';
 
 export const authRouter = Router();
 
@@ -20,6 +21,7 @@ const passwordSchema = z
   .min(8, '密码长度不少于 8 位')
   .max(64, '密码长度不超过 64 位');
 const codeSchema = z.string().regex(/^\d{6}$/, '验证码为 6 位数字');
+const inviteCodeSchema = z.string().trim().min(1, '请输入邀请码').max(120);
 
 function clientIp(req: any) {
   return (req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.ip || 'unknown') as string;
@@ -63,12 +65,34 @@ function userBrief(user: { id: string; email: string; name: string; role: string
 }
 
 authRouter.post(
+  '/validate-invite',
+  asyncHandler(async (req, res) => {
+    if (!(await isPublicRegisterAllowed())) {
+      throw new HttpError(403, '当前实例已关闭注册', 'REGISTER_CLOSED');
+    }
+    const { inviteCode } = z.object({ inviteCode: inviteCodeSchema }).parse(req.body);
+    if (!(await verifyRegisterInviteCode(inviteCode))) {
+      throw new HttpError(403, '邀请码不正确', 'INVALID_INVITE_CODE');
+    }
+    res.json({ ok: true });
+  }),
+);
+
+authRouter.post(
   '/register-code',
   asyncHandler(async (req, res) => {
     if (!(await isPublicRegisterAllowed())) {
       throw new HttpError(403, '当前实例已关闭注册', 'REGISTER_CLOSED');
     }
-    const { email } = z.object({ email: emailSchema }).parse(req.body);
+    const { email, inviteCode } = z
+      .object({
+        email: emailSchema,
+        inviteCode: inviteCodeSchema,
+      })
+      .parse(req.body);
+    if (!(await verifyRegisterInviteCode(inviteCode))) {
+      throw new HttpError(403, '邀请码不正确', 'INVALID_INVITE_CODE');
+    }
     const exists = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (exists) throw new HttpError(409, '该邮箱已注册', 'EMAIL_TAKEN');
     const result = await requestVerificationCode({
@@ -90,10 +114,14 @@ authRouter.post(
       .object({
         email: emailSchema,
         code: codeSchema,
+        inviteCode: inviteCodeSchema,
         password: passwordSchema,
         name: z.string().trim().min(1, '请输入用户名').max(40),
       })
       .parse(req.body);
+    if (!(await verifyRegisterInviteCode(body.inviteCode))) {
+      throw new HttpError(403, '邀请码不正确', 'INVALID_INVITE_CODE');
+    }
     const normalized = body.email.toLowerCase();
     const exists = await prisma.user.findUnique({ where: { email: normalized } });
     if (exists) throw new HttpError(409, '该邮箱已注册', 'EMAIL_TAKEN');
@@ -137,6 +165,60 @@ authRouter.post(
     });
     setAuthCookie(res, token);
     res.json({ user: userBrief(user) });
+  }),
+);
+
+authRouter.post(
+  '/google',
+  asyncHandler(async (req, res) => {
+    const body = z
+      .object({
+        credential: z.string().trim().min(1),
+        inviteCode: z.string().trim().max(120).optional(),
+      })
+      .parse(req.body);
+    const profile = await verifyGoogleCredential(body.credential);
+    const existing = await prisma.user.findUnique({ where: { email: profile.email } });
+    let user = existing;
+
+    if (user) {
+      if (user.status === 'DISABLED') throw new HttpError(403, '账号已被禁用', 'USER_DISABLED');
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          avatarUrl: user.avatarUrl || profile.picture || undefined,
+          lastLoginAt: new Date(),
+        },
+      });
+    } else {
+      if (!(await isPublicRegisterAllowed())) {
+        throw new HttpError(403, '当前实例已关闭注册', 'REGISTER_CLOSED');
+      }
+      if (!body.inviteCode || !(await verifyRegisterInviteCode(body.inviteCode))) {
+        throw new HttpError(403, '邀请码不正确', 'INVALID_INVITE_CODE');
+      }
+      user = await prisma.user.create({
+        data: {
+          email: profile.email,
+          passwordHash: await hashPassword(crypto.randomBytes(32).toString('hex')),
+          name: profile.name,
+          avatarUrl: profile.picture ?? null,
+          role: 'USER',
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          lastLoginAt: new Date(),
+        },
+      });
+      await prisma.workspace.create({ data: { name: `${profile.name} 的空间`, ownerId: user.id } });
+    }
+
+    const token = await issueSessionToken(user, {
+      userAgent: clientUserAgent(req),
+      ipAddr: clientIp(req),
+    });
+    setAuthCookie(res, token);
+    res.json({ user: userBrief(user), created: !existing });
   }),
 );
 

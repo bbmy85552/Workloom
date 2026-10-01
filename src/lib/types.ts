@@ -29,6 +29,7 @@ export interface DocNode {
   workspace?: { id: string; name: string; ownerId: string; kind?: WorkspaceKind };
   isFavorite?: boolean;
   favoritedAt?: string;
+  isFolder?: boolean;
 }
 
 export interface DocDetail extends DocNode {
@@ -53,6 +54,7 @@ export interface DocTreeResponse {
   public: DocNode[];
   shared: DocNode[];
   favorites: DocNode[];
+  counts?: Record<'mine' | 'public' | 'shared' | 'favorites', number>;
 }
 
 export interface NotificationItem {
@@ -334,6 +336,9 @@ export interface SystemSettings {
   default_workspace_name: string;
   max_upload_mb: string;
   brand_name: string;
+  company_name: string;
+  oa_url: string;
+  register_invite_code: string;
   [k: string]: string;
 }
 

@@ -11,6 +11,7 @@ import {
   Star,
   MessageSquare,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { api, asApiError, downloadFromApi, uploadFile } from '../../lib/api';
 import { useUiStore } from '../../store/ui';
@@ -21,6 +22,7 @@ import { ShareDialog } from '../../components/ShareDialog';
 import { VersionDrawer } from '../../components/VersionDrawer';
 import { PresenceIndicator } from '../../components/PresenceIndicator';
 import { DocumentToc } from '../../components/docs/DocumentToc';
+import { ConflictResolver, type DocConflict } from '../../components/docs/ConflictResolver';
 import { displayFilename } from '../../lib/filename';
 import type { EditorHeading } from '../../editor/Editor';
 
@@ -48,6 +50,25 @@ function htmlWithAbsoluteImages(html: string) {
   return box.innerHTML;
 }
 
+
+function docsListPathForDoc(
+  doc: Pick<DocDetail, 'parentId' | 'workspace'> & { workspace?: DocDetail['workspace'] },
+  access: DocAccess | null | undefined,
+  meId?: string,
+) {
+  const tab = access?.isPublic
+    ? 'public'
+    : doc.workspace?.ownerId === meId
+      ? 'mine'
+      : 'shared';
+  const params = new URLSearchParams({ tab });
+  // shared 列表不按文件夹浏览；mine/public 回到文档所在文件夹
+  if (tab !== 'shared' && doc.parentId) {
+    params.set('folder', doc.parentId);
+  }
+  return `/app/docs?${params.toString()}`;
+}
+
 export function DocDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -68,7 +89,9 @@ export function DocDetailPage() {
   const [title, setTitle] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty'>('saved');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty' | 'conflict'>('saved');
+  const [conflict, setConflict] = useState<DocConflict | null>(null);
+  const [conflictOpen, setConflictOpen] = useState(false);
   const [fonts, setFonts] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [comments, setComments] = useState<DocumentComment[]>([]);
@@ -79,39 +102,99 @@ export function DocDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [headings, setHeadings] = useState<EditorHeading[]>([]);
+  const [uploadBusy, setUploadBusy] = useState<'image' | 'attachment' | 'import' | null>(null);
   const editorRef = useRef<RichEditorRef>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const attachInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<number | null>(null);
   const draftRef = useRef<{ title?: string; contentJson?: string }>({});
+  const updatedAtRef = useRef<string | null>(null);
+  const titleRef = useRef('');
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const conflictRef = useRef(false);
+  const uploadBusyRef = useRef(false);
 
   const canWrite = access.canWrite;
   const canDelete = access.canDelete;
   const canInvite = access.canInvite;
 
-  const flushSave = useCallback(async () => {
-    if (!id) return;
-    if (!draftRef.current.title && !draftRef.current.contentJson) return;
-    setSaveStatus('saving');
-    try {
-      await api.patch(`/docs/${id}`, { ...draftRef.current });
-      draftRef.current = {};
-      setSaveStatus('saved');
-    } catch (err) {
-      setSaveStatus('dirty');
-      showToast(asApiError(err).error, 'error');
-    }
-  }, [id, showToast]);
+  const flushSave = useCallback(
+    async (opts?: { force?: boolean }) => {
+      if (!id) return;
+      while (saveInFlightRef.current) await saveInFlightRef.current;
+      if (!opts?.force && conflictRef.current) return;
+
+      const draft = { ...draftRef.current };
+      if (!opts?.force && draft.title === undefined && draft.contentJson === undefined) return;
+
+      const request = (async () => {
+        setSaveStatus('saving');
+        try {
+          const payload = {
+            ...(opts?.force
+              ? { title: titleRef.current, contentJson: editorRef.current?.editor?.getHTML() ?? '' }
+              : draft),
+            ...(opts?.force ? { force: true } : { expectedUpdatedAt: updatedAtRef.current ?? undefined }),
+          };
+          const { data } = await api.patch<{ doc: DocDetail }>(`/docs/${id}`, payload);
+
+          // Only remove fields included in this request. Edits made while it was saving stay queued.
+          if (draft.title !== undefined && draftRef.current.title === draft.title) {
+            delete draftRef.current.title;
+          }
+          if (draft.contentJson !== undefined && draftRef.current.contentJson === draft.contentJson) {
+            delete draftRef.current.contentJson;
+          }
+          updatedAtRef.current = data.doc.updatedAt;
+          setDoc(data.doc);
+          const hasPendingDraft =
+            draftRef.current.title !== undefined || draftRef.current.contentJson !== undefined;
+          setSaveStatus(hasPendingDraft ? 'dirty' : 'saved');
+        } catch (err) {
+          const apiErr = asApiError(err);
+          if (apiErr.code === 'DOC_CONFLICT') {
+            const remoteDoc = (apiErr.details as { doc: DocDetail } | undefined)?.doc;
+            if (remoteDoc) {
+              conflictRef.current = true;
+              setConflict({
+                mine: {
+                  title: titleRef.current,
+                  contentJson: editorRef.current?.editor?.getHTML() ?? draftRef.current.contentJson ?? '',
+                },
+                remote: { title: remoteDoc.title, contentJson: remoteDoc.contentJson },
+              });
+              setConflictOpen(true);
+              updatedAtRef.current = remoteDoc.updatedAt;
+            }
+            setSaveStatus('conflict');
+            return;
+          }
+          setSaveStatus('dirty');
+          showToast(apiErr.error, 'error');
+        }
+      })();
+
+      saveInFlightRef.current = request;
+      try {
+        await request;
+      } finally {
+        if (saveInFlightRef.current === request) saveInFlightRef.current = null;
+      }
+    },
+    [id, showToast],
+  );
 
   const scheduleSave = useCallback(() => {
     if (!canWrite) return;
+    // 冲突未解决期间暂停自动保存，避免继续打字触发新保存覆盖冲突状态
+    if (conflict) return;
     setSaveStatus('dirty');
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       void flushSave();
     }, 1000);
-  }, [flushSave, canWrite]);
+  }, [flushSave, canWrite, conflict]);
 
   useEffect(() => {
     return () => {
@@ -152,9 +235,26 @@ export function DocDetailPage() {
           api.get<{ list: UserFont[] }>('/fonts'),
           api.get<{ favorites: { id: string }[] }>('/docs/tree'),
         ]);
+        if (docRes.data.doc.isFolder) {
+          const nextTab = docRes.data.access.isPublic
+            ? 'public'
+            : docRes.data.doc.workspace?.ownerId === me?.id
+              ? 'mine'
+              : 'shared';
+          navigate(
+            nextTab === 'shared' ? '/app/docs?tab=shared' : `/app/docs?tab=${nextTab}&folder=${docRes.data.doc.id}`,
+            { replace: true },
+          );
+          return;
+        }
         setDoc(docRes.data.doc);
         setAccess(docRes.data.access);
         setTitle(docRes.data.doc.title);
+        titleRef.current = docRes.data.doc.title;
+        updatedAtRef.current = docRes.data.doc.updatedAt;
+        conflictRef.current = false;
+        setConflict(null);
+        setConflictOpen(false);
         setIsFavorite(!!treeRes.data.favorites.find((f) => f.id === id));
         const families = [
           ...fontsRes.data.list.map((f) => f.family),
@@ -168,11 +268,12 @@ export function DocDetailPage() {
         navigate('/app/docs');
       }
     })();
-  }, [id, navigate, showToast, loadAttachments, loadComments]);
+  }, [id, me?.id, navigate, showToast, loadAttachments, loadComments]);
 
   const handleTitle = (v: string) => {
     if (!canWrite) return;
     setTitle(v);
+    titleRef.current = v;
     draftRef.current.title = v;
     scheduleSave();
   };
@@ -194,14 +295,16 @@ export function DocDetailPage() {
     if (!ok) return;
     try {
       await api.delete(`/docs/${id}`);
-      navigate('/app/docs');
+      navigate(docsListPathForDoc(doc, access, me?.id));
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
   };
 
   const insertImage = async (file: File) => {
-    if (!id || !canWrite) return;
+    if (!id || !canWrite || uploadBusyRef.current) return;
+    uploadBusyRef.current = true;
+    setUploadBusy('image');
     try {
       const data = await uploadFile<{ attachment: Attachment }>(
         '/attachments/upload-image',
@@ -217,11 +320,22 @@ export function DocDetailPage() {
       showToast('图片已插入', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
+    } finally {
+      uploadBusyRef.current = false;
+      setUploadBusy(null);
+    }
+  };
+
+  const insertPastedImages = async (files: File[]) => {
+    for (const file of files) {
+      await insertImage(file);
     }
   };
 
   const insertAttachment = async (file: File) => {
-    if (!id || !canWrite) return;
+    if (!id || !canWrite || uploadBusyRef.current) return;
+    uploadBusyRef.current = true;
+    setUploadBusy('attachment');
     try {
       const data = await uploadFile<{ attachment: Attachment }>(
         '/attachments/upload',
@@ -241,19 +355,28 @@ export function DocDetailPage() {
       showToast('附件已插入', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
+    } finally {
+      uploadBusyRef.current = false;
+      setUploadBusy(null);
     }
   };
 
   const importDoc = async (file: File) => {
-    if (!doc) return;
+    if (!doc || uploadBusyRef.current) return;
+    uploadBusyRef.current = true;
+    setUploadBusy('import');
     try {
       const data = await uploadFile<{ doc: DocDetail }>('/docs/import', file, {
         workspaceId: doc.workspaceId,
+        parentId: doc?.parentId ?? null,
       });
       showToast('已导入为新文档', 'success');
       navigate(`/app/docs/${data.doc.id}`);
     } catch (err) {
       showToast(asApiError(err).error, 'error');
+    } finally {
+      uploadBusyRef.current = false;
+      setUploadBusy(null);
     }
   };
 
@@ -401,10 +524,46 @@ export function DocDetailPage() {
       const { data } = await api.get<{ doc: DocDetail }>(`/docs/${id}`);
       setDoc(data.doc);
       setTitle(data.doc.title);
+      titleRef.current = data.doc.title;
+      updatedAtRef.current = data.doc.updatedAt;
+      conflictRef.current = false;
       editorRef.current?.setContent(data.doc.contentJson);
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
+  };
+
+  // 冲突处理：用我的本地修改强制覆盖服务端
+  const handleOverwriteMine = async () => {
+    setConflictOpen(false);
+    await flushSave({ force: true });
+    conflictRef.current = false;
+    setConflict(null);
+    if (draftRef.current.title !== undefined || draftRef.current.contentJson !== undefined) {
+      setSaveStatus('dirty');
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => void flushSave(), 1000);
+    }
+  };
+
+  // 冲突处理：丢弃本地修改，加载服务端最新版本
+  const handleLoadRemote = async () => {
+    if (!conflict) return;
+    editorRef.current?.setContent(conflict.remote.contentJson);
+    setTitle(conflict.remote.title);
+    titleRef.current = conflict.remote.title;
+    draftRef.current = {};
+    setDoc((d) => (d ? { ...d, title: conflict.remote.title, contentJson: conflict.remote.contentJson } : d));
+    conflictRef.current = false;
+    setConflict(null);
+    setConflictOpen(false);
+    setSaveStatus('saved');
+    showToast('已加载最新版本', 'success');
+  };
+
+  const handleCloseConflict = () => {
+    setConflictOpen(false);
+    // 保持 saveStatus='conflict' 与徽章，用户可通过徽章重新打开
   };
 
   const initial = useMemo(() => doc?.contentJson ?? '', [doc?.id]);
@@ -415,7 +574,10 @@ export function DocDetailPage() {
     <div className="py-4 sm:py-6 animate-fade-in-up">
       <div className="no-print flex items-center justify-between mb-4 gap-2 flex-wrap">
         <button
-          onClick={() => navigate('/app/docs')}
+          onClick={() => {
+            if (doc) navigate(docsListPathForDoc(doc, access, me?.id));
+            else navigate('/app/docs');
+          }}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-liquid-indigo transition-colors"
         >
           <ChevronLeft size={16} /> 返回文档列表
@@ -435,17 +597,31 @@ export function DocDetailPage() {
           >
             {role === 'OWNER' ? '所有者' : role === 'EDITOR' ? '可编辑' : '仅查看'}
           </span>
-          <span
-            className={`text-xs ${
-              saveStatus === 'saved'
-                ? 'text-emerald-600'
-                : saveStatus === 'saving'
-                  ? 'text-text-secondary'
-                  : 'text-amber-600'
-            }`}
-          >
-            {!canWrite ? '只读' : saveStatus === 'saved' ? '已保存' : saveStatus === 'saving' ? '正在保存…' : '待保存'}
-          </span>
+          {saveStatus === 'conflict' ? (
+            <button
+              onClick={() => setConflictOpen(true)}
+              className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100"
+            >
+              <AlertTriangle size={12} /> 文档已被他人修改，点击查看
+            </button>
+          ) : (
+            <span
+              className={`text-xs ${
+                saveStatus === 'saved'
+                  ? 'text-emerald-600'
+                  : saveStatus === 'saving'
+                    ? 'text-text-secondary'
+                    : 'text-amber-600'
+              }`}
+            >
+              {!canWrite ? '只读' : saveStatus === 'saved' ? '已保存' : saveStatus === 'saving' ? '正在保存…' : '待保存'}
+            </span>
+          )}
+          {uploadBusy && (
+            <span className="text-xs px-2 py-1 rounded-full bg-liquid-indigo/10 text-liquid-indigo">
+              {uploadBusy === 'image' ? '图片上传中…' : uploadBusy === 'attachment' ? '附件上传中…' : '导入中…'}
+            </span>
+          )}
           {doc && (
             <>
               <button
@@ -556,8 +732,9 @@ export function DocDetailPage() {
               onHeadingsChange={setHeadings}
               fontFamilies={fonts}
               editable={canWrite}
+              onPasteImages={canWrite ? insertPastedImages : undefined}
               handlers={
-                canWrite
+                canWrite && !uploadBusy
                   ? {
                       onUploadImage: () => imageInputRef.current?.click(),
                       onUploadAttachment: () => attachInputRef.current?.click(),
@@ -621,6 +798,7 @@ export function DocDetailPage() {
         ref={imageInputRef}
         type="file"
         accept="image/*"
+        disabled={!!uploadBusy}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -631,6 +809,7 @@ export function DocDetailPage() {
       <input
         ref={attachInputRef}
         type="file"
+        disabled={!!uploadBusy}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -641,7 +820,8 @@ export function DocDetailPage() {
       <input
         ref={importInputRef}
         type="file"
-        accept=".docx,.md,.markdown,.txt"
+        accept=".docx,.md,.markdown,.txt,.pdf"
+        disabled={!!uploadBusy}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -665,6 +845,12 @@ export function DocDetailPage() {
             docId={doc.id}
             canWrite={canWrite}
             onRestored={onRestored}
+          />
+          <ConflictResolver
+            conflict={conflict}
+            onOverwriteMine={handleOverwriteMine}
+            onLoadRemote={handleLoadRemote}
+            onClose={handleCloseConflict}
           />
           {commentsOpen && (
             <div className="no-print fixed inset-y-0 right-0 z-40 w-full max-w-md bg-white shadow-2xl border-l border-black/10 flex flex-col">

@@ -41,8 +41,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const status = useEnsureMe();
   const user = useAuthStore((s) => s.user);
+  const location = useLocation();
   if (status !== 'ready') return <FullPageLoading />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (user.role !== 'ADMIN') return <Navigate to="/app/dashboard" replace />;
   return <>{children}</>;
 }
@@ -50,7 +51,16 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
 export function RequireGuest() {
   const status = useEnsureMe();
   const user = useAuthStore((s) => s.user);
+  const location = useLocation();
   if (status !== 'ready') return <FullPageLoading />;
-  if (user) return <Navigate to="/app/dashboard" replace />;
+  if (user) {
+    // 已登录用户访问登录/注册页时，回到来源页（优先 ?next=，回退 state.from，再回退 dashboard）
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next');
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+    const dest = next ?? from;
+    const safe = dest && dest.startsWith('/') && !dest.startsWith('//') ? dest : '/app/dashboard';
+    return <Navigate to={safe} replace />;
+  }
   return <Outlet />;
 }

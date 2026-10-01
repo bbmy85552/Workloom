@@ -11,6 +11,7 @@ import {
   Calendar,
   Mail,
   Clock,
+  BriefcaseBusiness,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const navItems = [
   { to: '/app/calendar', label: '日历', icon: Calendar },
   { to: '/app/mail', label: '邮箱', icon: Mail },
   { to: '/app/recent', label: '最近', icon: Clock },
+  { to: '/app/oa', label: 'OA', icon: BriefcaseBusiness },
   { to: '/app/settings/profile', label: '设置', icon: Settings },
 ];
 
@@ -38,6 +40,7 @@ export function Sidebar({ collapsedOverride }: SidebarProps = {}) {
   const setSidebar = useUiStore((s) => s.setSidebar);
   const collapsedFromStore = useUiStore((s) => s.sidebarCollapsed);
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed);
+  const setCollapsed = useUiStore((s) => s.setCollapsed);
   const collapsed = collapsedOverride ?? collapsedFromStore;
   const navigate = useNavigate();
 
@@ -85,7 +88,10 @@ export function Sidebar({ collapsedOverride }: SidebarProps = {}) {
           <NavLink
             key={item.to}
             to={item.to}
-            onClick={() => setSidebar(false)}
+            onClick={() => {
+              setSidebar(false);
+              if (item.to === '/app/oa' && !collapsedOverride) setCollapsed(true);
+            }}
             title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               `w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} py-2.5 rounded-xl text-sm transition-all relative overflow-hidden ${

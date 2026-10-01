@@ -5,15 +5,15 @@ export type LanguagePreference = UserPreferences['language'];
 const LANGUAGE_KEY = 'jianji.language';
 
 const exactEn: Record<string, string> = {
-  简记: 'Jianji',
-  '简记 - 个人文档中心': 'Jianji - Personal Workspace',
-  开源文档中心: 'Open-source workspace',
+  简记: 'Document Center',
+  文档中心: 'Workspace',
   工作台: 'Dashboard',
   知识库: 'Docs',
   数据表: 'Tables',
   日历: 'Calendar',
   邮箱: 'Mail',
   最近: 'Recent',
+  OA: 'OA',
   设置: 'Settings',
   帮助: 'Help',
   管理后台: 'Admin',
@@ -85,9 +85,44 @@ const exactEn: Record<string, string> = {
   // Settings
   个人资料: 'Profile',
   密码与邮箱: 'Password & Email',
+  'AI 与 CLI': 'AI & CLI',
   偏好设置: 'Preferences',
   字体管理: 'Font Management',
   账号安全相关设置: 'Account security settings',
+  '为 AI 客户端、MCP 和命令行创建访问凭证。':
+    'Create access credentials for AI clients, MCP, and command line tools.',
+  '每个用户只有一个 API Key。重建后旧 Key 会立即失效，明文只显示这一次。':
+    'Each user has one API Key. Regenerating it immediately invalidates the old key, and the plaintext is shown only once.',
+  '当前 Key': 'Current Key',
+  最近使用: 'Last Used',
+  从未使用: 'Never used',
+  '还没有 API Key。': 'No API Key yet.',
+  '新 API Key': 'New API Key',
+  '请立即保存。关闭或刷新页面后将无法再次查看明文。':
+    'Save it now. After closing or refreshing this page, the plaintext cannot be viewed again.',
+  '复制 API Key': 'Copy API Key',
+  '生成 API Key': 'Generate API Key',
+  '重建 API Key': 'Regenerate API Key',
+  '删除 API Key': 'Delete API Key',
+  '重建后旧 API Key 会立即失效，继续吗？':
+    'Regenerating will immediately invalidate the old API Key. Continue?',
+  '确认删除当前 API Key？删除后 CLI 和 AI 工具将无法访问。':
+    'Delete the current API Key? CLI and AI tools will no longer be able to access your account.',
+  '新的 API Key 已生成，请立即保存': 'New API Key generated. Save it now.',
+  'API Key 已删除': 'API Key deleted',
+  '远程 MCP': 'Remote MCP',
+  '支持远程 MCP 的客户端可以直接连接 docs-platform，不需要下载源码。':
+    'Clients that support remote MCP can connect directly to docs-platform without downloading the source code.',
+  'MCP 地址': 'MCP URL',
+  客户端配置示例: 'Client Configuration Example',
+  '测试 tools/list': 'Test tools/list',
+  '本地 CLI': 'Local CLI',
+  'CLI 主要用于开发和排查。AI 客户端优先使用远程 MCP 地址。':
+    'The CLI is mainly for development and troubleshooting. AI clients should prefer the remote MCP URL.',
+  环境变量与命令: 'Environment Variables and Commands',
+  'API Key 会以当前用户身份访问文档和数据表。不要把 API Key 写入公开仓库、截图或共享文档。':
+    'The API Key accesses documents and tables as the current user. Do not put it in public repositories, screenshots, or shared documents.',
+  最近重建: 'Last Regenerated',
   修改密码: 'Change Password',
   当前密码: 'Current Password',
   新密码: 'New Password',
@@ -178,6 +213,16 @@ const exactEn: Record<string, string> = {
   '至少 8 位': 'At least 8 characters',
   品牌名称: 'Brand Name',
   登录页与顶部导航显示的名称: 'Name shown on the login page and top navigation',
+  公司名: 'Company Name',
+  显示在侧边栏品牌名称下方: 'Shown below the brand name in the sidebar',
+  注册邀请码: 'Registration Invite Code',
+  新用户必须填写正确邀请码才能注册: 'New users must enter the correct invite code to register',
+  设置后发给需要注册的成员: 'Share this with members who need to register',
+  'OA 地址': 'OA URL',
+  '侧边栏 OA 页面 iframe 加载的 URL': 'URL loaded in the sidebar OA iframe page',
+  新窗口打开: 'Open in New Window',
+  邀请码: 'Invite Code',
+  请输入管理员提供的邀请码: 'Enter the invite code from your administrator',
   默认工作区名称: 'Default Workspace Name',
   新用户注册或被创建时自动生成的工作区名:
     'Workspace name generated for new users',
@@ -268,7 +313,7 @@ const exactEn: Record<string, string> = {
   今天是: 'Today is',
   '今天是 ': 'Today is ',
   '，把重要的事情先完成吧。': ". Let's finish the important things first.",
-  简记用户: 'Jianji User',
+  简记用户: 'Document Center User',
   '今日还没有待办，添加一项开始吧': 'No todos today. Add one to get started.',
   今日进度: "Today's Progress",
   添加待办: 'Add Todo',
@@ -317,6 +362,12 @@ const exactEn: Record<string, string> = {
   网格: 'Grid',
   树形: 'Tree',
   导入文件: 'Import File',
+  复制到公共知识库: 'Copy to Public Docs',
+  文件夹名称: 'Folder Name',
+  文件夹: 'Folder',
+  移动到文件夹: 'Move to Folder',
+  公共知识库根目录: 'Public Docs Root',
+  移动: 'Move',
   我的知识库: 'My Docs',
   我的私人知识库: 'My Private Docs',
   仅自己可见: 'Only visible to you',
@@ -480,15 +531,15 @@ const exactEn: Record<string, string> = {
   显示名称: 'Display Name',
   管理员邮箱: 'Admin Email',
   管理员密码: 'Admin Password',
-  首次配置简记: 'First-time Jianji Setup',
+  首次配置简记: 'First-time Document Center Setup',
   需要初始化密钥: 'Setup Token Required',
   正在检查初始化状态: 'Checking setup status',
   '正在检查初始化状态…': 'Checking setup status...',
   完成配置: 'Complete Setup',
   页面走丢了: 'Page not found.',
   '页面走丢了。': 'Page not found.',
-  '登录简记，开始你的工作': 'Log in to Jianji and start your work',
-  '登录简记，开始你的工作。': 'Log in to Jianji and start your work.',
+  '登录简记，开始你的工作': 'Log in to the document center and start your work',
+  '登录简记，开始你的工作。': 'Log in to the document center and start your work.',
   还没有账号: 'No account yet',
   '还没有账号？': 'No account yet?',
   忘记密码: 'Forgot password',
@@ -572,7 +623,7 @@ const exactEn: Record<string, string> = {
   加入协作: 'Join Collaboration',
   已加入协作: 'Joined collaboration',
   无法打开分享内容: 'Cannot open shared content',
-  '简记 · 公开表单': 'Jianji · Public Form',
+  '简记 · 公开表单': 'Document Center · Public Form',
   由表单创建者邀请你填写: 'Invited by the form creator',
   '提交成功，感谢你的反馈': 'Submitted successfully. Thank you for your feedback',
   '提交成功，感谢你的反馈！': 'Submitted successfully. Thank you for your feedback!',
@@ -600,13 +651,37 @@ const exactEn: Record<string, string> = {
   '例如 Inter, Noto Sans SC': 'For example, Inter or Noto Sans SC',
   字体来源: 'Font Source',
   '官网链接、字体文件 URL 或开源仓库地址': 'Official site, font file URL, or open-source repository URL',
-  '我已确认拥有该字体在当前使用场景下的合法授权，且不会与简记开源协议或本机部署冲突。':
-    'I confirm I have the legal right to use this font in the current scenario and that it does not conflict with the Jianji open-source license or this deployment.',
+  '我已确认拥有该字体在当前使用场景下的合法授权，且不会与当前部署的使用要求冲突。':
+    'I confirm I have the legal right to use this font in the current scenario and that it does not conflict with this deployment.',
   添加字体: 'Add Font',
   保存中: 'Saving',
   '保存中…': 'Saving...',
   保存修改: 'Save Changes',
   历史头像: 'Avatar History',
+  回收站: 'Trash',
+  '公共知识库中被删除的文档，保留 30 天后自动清理':
+    'Deleted documents from the public workspace are retained for 30 days before automatic cleanup.',
+  删除人: 'Deleted By',
+  删除时间: 'Deleted At',
+  剩余保留: 'Retained For',
+  恢复: 'Restore',
+  彻底删除: 'Purge',
+  回收站为空: 'Trash is empty',
+  '恢复到原位置': 'restore to its original location',
+  '彻底删除（不可恢复）': 'Permanently delete (irreversible)',
+  '已彻底删除': 'Permanently deleted',
+  '已恢复到原位置': 'Restored to its original location',
+  '确认恢复文档': 'Restore document',
+  '将还原到其原位置。': 'It will be restored to its original location.',
+  '确认彻底删除': 'Confirm permanent deletion',
+  恢复文档: 'Restore document',
+  '彻底删除文档': 'Purge document',
+  '移动到公共知识库': 'Move to Public Workspace',
+  '已移动到公共知识库': 'Moved to public workspace',
+  '已复制到公共知识库': 'Copied to public workspace',
+  '移到我的私密空间': 'Move to My Private Space',
+  '转为私密': 'Make Private',
+  '已移到我的私密空间': 'Moved to my private space',
 };
 
 const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
@@ -632,6 +707,8 @@ const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
   [/^共 (\d+) 人 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} users · Page ${m[2]} / ${m[3]}`],
   [/^共 (\d+) 条 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} logs · Page ${m[2]} / ${m[3]}`],
   [/^(.+) · 创建于 (.+)$/, (m) => `${m[1]} · Created at ${m[2]}`],
+  [/^创建：(.+) · 最近重建：(.+)$/, (m) => `Created: ${m[1]} · Last regenerated: ${m[2]}`],
+  [/^创建：(.+)$/, (m) => `Created: ${m[1]}`],
   [/^当前版本：(.+)·最新版本：(.+)·(.+)$/, (m) => `Current version: ${m[1]} · Latest version: ${m[2]} · ${translateText(m[3])}`],
   [/^(\d+) 分钟前$/, (m) => `${m[1]} minutes ago`],
   [/^(\d+) 小时前$/, (m) => `${m[1]} hours ago`],
@@ -663,6 +740,16 @@ const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
   [/^选择(.+)$/, (m) => `Choose ${translateText(m[1])}`],
   [/^删除(.+)$/, (m) => `Delete ${translateText(m[1])}`],
   [/^(.+) 暂无待办$/, (m) => `No todos for ${m[1]}`],
+  [/^创建者：(.+)$/, (m) => `Creator: ${m[1]}`],
+  [/^上传者：(.+)$/, (m) => `Uploader: ${m[1]}`],
+  [/^确认将「(.+)」移动到公共知识库？移动后将从私人知识库移除，所有注册用户可查看。$/, (m) => `Move "${m[1]}" to the public workspace? It will be removed from your private workspace and visible to all registered users.`],
+  [/^已移动 (\d+) 个文档到公共知识库$/, (m) => `Moved ${m[1]} documents to the public workspace`],
+  [/^确认将「(.+)」复制到公共知识库？复制后所有注册用户都可以查看。$/, (m) => `Copy "${m[1]}" to the public workspace? All registered users will be able to view it.`],
+  [/^已复制 (\d+) 个文档到公共知识库$/, (m) => `Copied ${m[1]} documents to the public workspace`],
+  [/^确认将「(.+)」移到你的私密空间？移动后将从公共知识库移除，仅你的管理员账号可访问。$/, (m) => `Move "${m[1]}" to your private space? It will be removed from the public workspace and only your admin account will have access.`],
+  [/^已将 (\d+) 个文档移到私密空间$/, (m) => `Moved ${m[1]} documents to your private space`],
+  [/^确认恢复文档「(.+)」？将还原到其原位置。$/, (m) => `Restore document "${m[1]}"? It will be restored to its original location.`],
+  [/^确认彻底删除文档「(.+)」？此操作不可恢复，文档及其版本、评论、附件将永久消失。$/, (m) => `Permanently delete document "${m[1]}"? This cannot be undone. The document and its versions, comments, and attachments will be permanently lost.`],
 ];
 
 const attrNames = ['placeholder', 'title', 'aria-label', 'alt'] as const;
@@ -724,13 +811,21 @@ function translateTextNode(node: Text, language: LanguagePreference) {
   const current = node.nodeValue ?? '';
   let source = originalText.get(node);
   const lastTranslated = translatedText.get(node);
+
+  if (language !== 'en') {
+    const next = lastTranslated !== undefined && current === lastTranslated && source !== undefined ? source : current;
+    originalText.set(node, next);
+    translatedText.delete(node);
+    if (node.nodeValue !== next) node.nodeValue = next;
+    return;
+  }
+
   if (source === undefined || (lastTranslated !== undefined && current !== lastTranslated)) {
     source = current;
     originalText.set(node, source);
   }
-  const next = language === 'en' ? translateText(source, 'en') : source;
-  if (language === 'en') translatedText.set(node, next);
-  else translatedText.delete(node);
+  const next = translateText(source, 'en');
+  translatedText.set(node, next);
   if (node.nodeValue !== next) node.nodeValue = next;
 }
 
@@ -750,13 +845,19 @@ function translateAttrs(el: Element, language: LanguagePreference) {
       translatedAttrs.set(el, translatedMap);
     }
     const lastTranslated = translatedMap.get(attr);
+    if (language !== 'en') {
+      const next = lastTranslated !== undefined && current === lastTranslated && map.has(attr) ? map.get(attr)! : current;
+      map.set(attr, next);
+      translatedMap.delete(attr);
+      if (current !== next) el.setAttribute(attr, next);
+      continue;
+    }
     if (!map.has(attr) || (lastTranslated !== undefined && current !== lastTranslated)) {
       map.set(attr, current);
     }
     const source = map.get(attr) ?? current;
-    const next = language === 'en' ? translateText(source, 'en') : source;
-    if (language === 'en') translatedMap.set(attr, next);
-    else translatedMap.delete(attr);
+    const next = translateText(source, 'en');
+    translatedMap.set(attr, next);
     if (current !== next) el.setAttribute(attr, next);
   }
 }

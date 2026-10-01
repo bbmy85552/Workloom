@@ -11,8 +11,22 @@ export function htmlToMarkdown(html: string): string {
   return turndown.turndown(html || '');
 }
 
-export async function htmlToDocx(html: string, title?: string): Promise<Buffer> {
-  const wrapped = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title || '文档')}</title></head><body>${html || '<p></p>'}</body></html>`;
+export async function htmlToDocx(html: string, title?: string, origin?: string): Promise<Buffer> {
+  // html-to-docx 库对部分 HTML 结构会崩溃，需在转换前清洗：
+  //  1) 自闭合 <img>（无 </img>）→ buildParagraph null 解引用；且无法处理相对路径图片。
+  //     处理：补闭合标签 + 相对 src 补全为绝对 URL。
+  //  2) table/col/colgroup/th/td 的 inline style（百分比宽度等）→ buildTableCellWidth
+  //     生成非法 XML 名称（Invalid XML name: @w）。处理：剥离这些元素的 style 属性（docx 用默认布局）。
+  let safe = html || '<p></p>';
+  if (origin) {
+    safe = safe.replace(/(<img[^>]*?)\ssrc="\/(?!\/)/gi, `$1 src="${origin}/`);
+  }
+  safe = safe.replace(/<img([^>]*?)\/?>/gi, '<img$1></img>');
+  safe = safe.replace(
+    /(<(?:table|colgroup|col|thead|tbody|tfoot|tr|th|td)\b[^>]*?)\sstyle="[^"]*"/gi,
+    '$1',
+  );
+  const wrapped = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title || '文档')}</title></head><body>${safe}</body></html>`;
   const buffer = (await htmlToDocxLib(wrapped, undefined, {
     table: { row: { cantSplit: true } },
     footer: false,

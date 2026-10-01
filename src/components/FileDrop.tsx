@@ -16,10 +16,11 @@ export function FileDrop({ accept, multiple, hint, busy, onFiles, className }: F
 
   const handle = useCallback(
     (files: FileList | null) => {
+      if (busy) return;
       if (!files || files.length === 0) return;
       onFiles(Array.from(files));
     },
-    [onFiles],
+    [busy, onFiles],
   );
 
   return (
@@ -51,6 +52,7 @@ export function FileDrop({ accept, multiple, hint, busy, onFiles, className }: F
         type="file"
         accept={accept}
         multiple={multiple}
+        disabled={busy}
         className="hidden"
         onChange={(e) => {
           handle(e.target.files);

@@ -28,8 +28,10 @@ import {
   Superscript as SuperIcon,
   Subscript as SubIcon,
   Search,
+  Sparkles,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/react';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 export interface EditorToolbarHandlers {
   onUploadImage?: () => void;
@@ -97,6 +99,7 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
   const [showColor, setShowColor] = useState(false);
   const [showHL, setShowHL] = useState(false);
   const promptDialog = useUiStore((s) => s.promptDialog);
+  const showToast = useUiStore((s) => s.showToast);
 
   const setLink = useCallback(async () => {
     if (!editor) return;
@@ -115,6 +118,46 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor, promptDialog]);
+
+  const autoFitCurrentTable = useCallback(() => {
+    if (!editor) return;
+    const tableInfo = findCurrentTable(editor);
+    if (!tableInfo) {
+      showToast('请先把光标放到要排版的表格里', 'error');
+      return;
+    }
+    const widths = getTableColumnWidthPercents(tableInfo.node);
+    if (widths.length === 0) {
+      showToast('没有可排版的表格列', 'error');
+      return;
+    }
+
+    const tr = editor.state.tr;
+    tr.setNodeMarkup(tableInfo.pos, undefined, {
+      ...tableInfo.node.attrs,
+      autoFit: 'true',
+    });
+
+    tableInfo.node.descendants((node, pos) => {
+      if (node.type.name !== 'tableHeader' && node.type.name !== 'tableCell') return;
+      const colRange = getCellColumnRange(tableInfo.node, pos);
+      if (!colRange) return;
+      const width = widths.slice(colRange.start, colRange.end).reduce((sum, item) => sum + item, 0);
+      const style = mergeCellStyle(node.attrs.style as string | null, {
+        width: `${width.toFixed(2)}%`,
+        'text-align': node.type.name === 'tableHeader' ? 'center' : 'left',
+      });
+      tr.setNodeMarkup(tableInfo.pos + 1 + pos, undefined, {
+        ...node.attrs,
+        colwidth: null,
+        style,
+      });
+    });
+
+    editor.view.dispatch(tr.scrollIntoView());
+    editor.commands.focus();
+    showToast('已自动排版当前表格', 'success');
+  }, [editor, showToast]);
 
   if (!editor) return null;
 
@@ -240,7 +283,7 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
             <span className="w-4 h-4 rounded border" style={{ background: editor.getAttributes('textStyle').color ?? '#1b1b1d' }} />
           </ToolButton>
           {showColor && (
-            <div className="absolute top-9 left-0 z-20 p-2 bg-white border border-black/10 rounded-lg shadow-lg flex gap-1.5 flex-wrap w-40">
+            <div className="absolute top-9 left-0 z-20 p-2 bg-surface-container-lowest border border-black/10 rounded-lg shadow-lg flex gap-1.5 flex-wrap w-40">
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
@@ -272,7 +315,7 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
             <Highlighter size={16} />
           </ToolButton>
           {showHL && (
-            <div className="absolute top-9 left-0 z-20 p-2 bg-white border border-black/10 rounded-lg shadow-lg flex gap-1.5 flex-wrap w-44">
+            <div className="absolute top-9 left-0 z-20 p-2 bg-surface-container-lowest border border-black/10 rounded-lg shadow-lg flex gap-1.5 flex-wrap w-44">
               {HIGHLIGHTS.map((c) => (
                 <button
                   key={c}
@@ -404,6 +447,13 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
         >
           <TableIcon size={16} />
         </ToolButton>
+        <ToolButton
+          title="自动排版当前表格：自适应列宽，列名居中，数据居左"
+          disabled={!editor.isActive('table')}
+          onClick={autoFitCurrentTable}
+        >
+          <Sparkles size={16} />
+        </ToolButton>
 
         {handlers?.onUploadImage && (
           <ToolButton title="插入图片" onClick={handlers.onUploadImage}>
@@ -416,7 +466,7 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
           </ToolButton>
         )}
         {handlers?.onImportFile && (
-          <ToolButton title="导入 docx / md" onClick={handlers.onImportFile}>
+          <ToolButton title="导入文件：支持 Word (.docx)、PDF (.pdf)、Markdown (.md/.markdown)、纯文本 (.txt)" onClick={handlers.onImportFile}>
             <Upload size={16} />
           </ToolButton>
         )}
@@ -428,4 +478,158 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
       </div>
     </div>
   );
+}
+
+function findCurrentTable(editor: Editor): { node: ProseMirrorNode; pos: number } | null {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth);
+    if (node.type.name === 'table') {
+      return { node, pos: $from.before(depth) };
+    }
+  }
+  return null;
+}
+
+function getTableColumnWidthPercents(table: ProseMirrorNode): number[] {
+  const columnScores: number[] = [];
+  const columnTexts: string[][] = [];
+
+  table.forEach((row) => {
+    let column = 0;
+    row.forEach((cell) => {
+      const colspan = Math.max(1, Number(cell.attrs.colspan) || 1);
+      const text = cell.textContent.trim();
+      for (let index = 0; index < colspan; index += 1) {
+        const targetColumn = column + index;
+        columnTexts[targetColumn] = columnTexts[targetColumn] ?? [];
+        columnTexts[targetColumn].push(text);
+      }
+      column += colspan;
+    });
+  });
+
+  for (let index = 0; index < columnTexts.length; index += 1) {
+    const texts = columnTexts[index] ?? [];
+    const widest = texts.reduce((max, text) => Math.max(max, measureEditorTextWidth(text)), 0);
+    const widestToken = texts.reduce(
+      (max, text) => Math.max(max, measureEditorTextWidth(getLongestTextToken(text))),
+      0,
+    );
+    const average = texts.length
+      ? texts.reduce((sum, text) => sum + measureEditorTextWidth(text), 0) / texts.length
+      : 0;
+    columnScores[index] = Math.max(24, widestToken * 0.55 + widest * 0.15 + average * 1.15);
+  }
+
+  const total = columnScores.reduce((sum, score) => sum + score, 0);
+  if (total <= 0) return [];
+
+  return distributeColumnPercents(
+    columnScores.map((score) => (score / total) * 100),
+  );
+}
+
+function distributeColumnPercents(rawPercents: number[]): number[] {
+  const count = rawPercents.length;
+  if (count === 0) return [];
+
+  const minPercent = Math.min(count === 2 ? 18 : count <= 4 ? 12 : 8, 100 / count);
+  const maxPercent = count === 2 ? 82 : count === 3 ? 70 : count === 4 ? 58 : 48;
+  const locked = new Set<number>();
+  const result = rawPercents.map((value) => Math.min(Math.max(value, minPercent), maxPercent));
+
+  for (let guard = 0; guard < count * 2; guard += 1) {
+    const total = result.reduce((sum, value) => sum + value, 0);
+    const delta = 100 - total;
+    if (Math.abs(delta) < 0.01) break;
+
+    const adjustable = result
+      .map((value, index) => ({ value, index }))
+      .filter(({ value, index }) => {
+        if (locked.has(index)) return false;
+        return delta > 0 ? value < maxPercent : value > minPercent;
+      });
+    if (adjustable.length === 0) break;
+
+    const share = delta / adjustable.length;
+    for (const item of adjustable) {
+      const next = Math.min(Math.max(item.value + share, minPercent), maxPercent);
+      if (next === item.value) locked.add(item.index);
+      result[item.index] = next;
+    }
+  }
+
+  const total = result.reduce((sum, value) => sum + value, 0);
+  if (total !== 0) {
+    const drift = 100 - total;
+    const target = result.reduce(
+      (best, value, index) => (value > result[best] ? index : best),
+      0,
+    );
+    result[target] += drift;
+  }
+
+  return result;
+}
+
+function getLongestTextToken(text: string): string {
+  const tokens = text
+    .split(/[\s,，、;；/]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) return text;
+  return tokens.reduce((longest, item) =>
+    measureEditorTextWidth(item) > measureEditorTextWidth(longest) ? item : longest,
+  );
+}
+
+function getCellColumnRange(
+  table: ProseMirrorNode,
+  targetRelativePos: number,
+): { start: number; end: number } | null {
+  let found: { start: number; end: number } | null = null;
+
+  table.descendants((node, pos, parent) => {
+    if (found) return false;
+    if (pos !== targetRelativePos) return;
+    if (node.type.name !== 'tableCell' && node.type.name !== 'tableHeader') return;
+    if (!parent || parent.type.name !== 'tableRow') return;
+
+    let column = 0;
+    parent.forEach((cell) => {
+      if (cell === node) {
+        const colspan = Math.max(1, Number(cell.attrs.colspan) || 1);
+        found = { start: column, end: column + colspan };
+      }
+      column += Math.max(1, Number(cell.attrs.colspan) || 1);
+    });
+    return false;
+  });
+
+  return found;
+}
+
+function measureEditorTextWidth(text: string): number {
+  return Array.from(text).reduce((sum, char) => {
+    if (char.charCodeAt(0) <= 0x7f) return sum + 7;
+    return sum + 14;
+  }, 0);
+}
+
+function mergeCellStyle(
+  style: string | null,
+  next: Record<string, string>,
+): string {
+  const entries = new Map<string, string>();
+  for (const part of (style ?? '').split(';')) {
+    const [rawKey, ...rawValue] = part.split(':');
+    const key = rawKey?.trim().toLowerCase();
+    const value = rawValue.join(':').trim();
+    if (key && value) entries.set(key, value);
+  }
+  for (const [key, value] of Object.entries(next)) {
+    entries.set(key, value);
+  }
+  return Array.from(entries, ([key, value]) => `${key}: ${value}`).join('; ');
 }

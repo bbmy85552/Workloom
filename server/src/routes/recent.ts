@@ -31,6 +31,7 @@ recentRouter.get(
       const docs = await prisma.document.findMany({
         where: {
           isArchived: false,
+          deletedAt: null,
           OR: [{ createdById: userId }, { permissions: { some: { userId } } }],
         },
         orderBy: { updatedAt: 'desc' },

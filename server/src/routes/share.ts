@@ -8,6 +8,23 @@ import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 
 export const shareRouter = Router();
 
+/** Append share token so anonymous viewers can load private doc/table attachments. */
+function withShareToken(content: string, token: string): string {
+  return content.replace(
+    /\/api\/attachments\/([^\/"'?\s]+)\/raw(\?[^"'\s]*)?/g,
+    (_full, id: string, qs?: string) => {
+      if (qs && /(?:^|[?&])st=/.test(qs)) {
+        return `/api/attachments/${id}/raw${qs}`;
+      }
+      if (qs) {
+        return `/api/attachments/${id}/raw${qs}&st=${encodeURIComponent(token)}`;
+      }
+      return `/api/attachments/${id}/raw?st=${encodeURIComponent(token)}`;
+    },
+  );
+}
+
+
 async function loadResource(resourceType: string, resourceId: string) {
   if (resourceType === 'doc') {
     const doc = await prisma.document.findUnique({
@@ -59,7 +76,7 @@ shareRouter.get(
 
     if (link.resourceType === 'doc') {
       const doc = await prisma.document.findUnique({
-        where: { id: link.resourceId },
+        where: { id: link.resourceId, deletedAt: null },
         select: {
           id: true,
           title: true,
@@ -69,7 +86,12 @@ shareRouter.get(
         },
       });
       if (!doc) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
-      res.json({ resourceType: 'doc', role: link.role, requireLogin: link.requireLogin, doc });
+      res.json({
+        resourceType: 'doc',
+        role: link.role,
+        requireLogin: link.requireLogin,
+        doc: { ...doc, contentJson: withShareToken(doc.contentJson || '', link.token) },
+      });
       return;
     }
     if (link.resourceType === 'table') {

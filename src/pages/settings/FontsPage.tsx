@@ -158,7 +158,7 @@ export function FontsPage() {
         </Field>
         <label className="flex items-start gap-2 text-xs text-text-secondary mb-4">
           <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />
-          我已确认拥有该字体在当前使用场景下的合法授权，且不会与简记开源协议或本机部署冲突。
+          我已确认拥有该字体在当前使用场景下的合法授权，且不会与当前部署的使用要求冲突。
         </label>
         <button
           type="submit"

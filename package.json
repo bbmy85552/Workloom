@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "test": "npm --prefix server run test",
     "setup": "npm install && npm --prefix server install && npm --prefix server run prisma:generate && npm --prefix server run prisma:migrate",
-    "deploy": "bash scripts/install.sh"
+    "deploy": "bash scripts/install.sh",
+    "docs-platform": "node scripts/docs-platform-cli.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -40,6 +41,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "axios": "^1.7.9",
     "lucide-react": "^0.546.0",
+    "marked": "^18.0.7",
     "papaparse": "^5.5.3",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",

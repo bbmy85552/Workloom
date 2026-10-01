@@ -5,14 +5,30 @@ import { prisma } from '../prisma.js';
 import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
-import { uploadDocImport } from '../lib/upload.js';
+import {
+  resolveExistingUploadPath,
+  resolveUploadPath,
+  storeUploadBuffer,
+  uploadDocImport,
+} from '../lib/upload.js';
 import { importByExtension } from '../lib/textImport.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
 import { htmlToDocx, htmlToFullPage, htmlToMarkdown } from '../lib/export.js';
-import { contentDispositionAttachment } from '../lib/filename.js';
+import { contentDispositionAttachment, normalizeFilename } from '../lib/filename.js';
 
 export const docRouter = Router();
 docRouter.use(requireAuth, requireEmailVerified);
+
+const ATTACHMENT_RAW_RE = /\/api\/attachments\/([^/?#]+)\/raw/g;
+const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
+
+function isFolderContent(contentJson: string | null | undefined) {
+  return (contentJson ?? '').includes('data-jianji-type="folder"');
+}
+
+function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
+  return { ...doc, isFolder: isFolderContent(doc.contentJson) };
+}
 
 async function findTargetWorkspace(userId: string, kind: 'PRIVATE' | 'PUBLIC') {
   if (kind === 'PUBLIC') {
@@ -28,9 +44,46 @@ async function findTargetWorkspace(userId: string, kind: 'PRIVATE' | 'PUBLIC') {
   return ws;
 }
 
+async function copyDocumentAttachments(sourceDocumentId: string, targetDocumentId: string, userId: string) {
+  const attachments = await prisma.attachment.findMany({ where: { documentId: sourceDocumentId } });
+  const idMap = new Map<string, string>();
+  for (const attachment of attachments) {
+    const sourcePath = resolveExistingUploadPath(attachment.storedName);
+    if (!sourcePath || !fs.existsSync(sourcePath)) continue;
+    const buffer = await fs.promises.readFile(sourcePath);
+    const stored = await storeUploadBuffer(buffer, {
+      subdir: 'attachments',
+      originalName: attachment.originalName,
+    });
+    const copied = await prisma.attachment.create({
+      data: {
+        ownerId: userId,
+        documentId: targetDocumentId,
+        tableId: null,
+        category: attachment.category,
+        originalName: attachment.originalName,
+        storedName: stored.storedName,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+      },
+    });
+    idMap.set(attachment.id, copied.id);
+  }
+  return idMap;
+}
+
+function rewriteAttachmentLinks(contentJson: string, idMap: Map<string, string>) {
+  if (idMap.size === 0) return contentJson;
+  return contentJson.replace(ATTACHMENT_RAW_RE, (full, id: string) => {
+    const nextId = idMap.get(id);
+    return nextId ? `/api/attachments/${nextId}/raw` : full;
+  });
+}
+
 docRouter.get(
   '/tree',
   asyncHandler(async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     const ownWorkspaces = await prisma.workspace.findMany({
       where: { ownerId: req.user!.id, kind: 'PRIVATE' },
       orderBy: { createdAt: 'asc' },
@@ -39,7 +92,7 @@ docRouter.get(
     const wsIds = ownWorkspaces.map((w) => w.id);
 
     const favoritesRel = await prisma.documentFavorite.findMany({
-      where: { userId: req.user!.id },
+      where: { userId: req.user!.id, document: { isArchived: false, deletedAt: null } },
       include: {
         document: {
           select: {
@@ -47,6 +100,7 @@ docRouter.get(
             title: true,
             parentId: true,
             workspaceId: true,
+            contentJson: true,
             updatedAt: true,
             createdById: true,
             workspace: { select: { id: true, name: true, kind: true, ownerId: true } },
@@ -57,24 +111,25 @@ docRouter.get(
       orderBy: { createdAt: 'desc' },
     });
     const favorites = favoritesRel.filter((f) => f.document).map((f) => ({
-      ...f.document!,
+      ...withFolderFlag(f.document!),
       favoritedAt: f.createdAt,
     }));
     const favoriteIds = new Set(favorites.map((f) => f.id));
 
     const mineDocs = await prisma.document.findMany({
-      where: { workspaceId: { in: wsIds }, isArchived: false },
-      select: { id: true, title: true, parentId: true, workspaceId: true, updatedAt: true, createdById: true },
+      where: { workspaceId: { in: wsIds }, isArchived: false, deletedAt: null },
+      select: { id: true, title: true, parentId: true, workspaceId: true, contentJson: true, updatedAt: true, createdById: true },
       orderBy: { updatedAt: 'desc' },
     });
     const publicDocs = publicWs
       ? await prisma.document.findMany({
-          where: { workspaceId: publicWs.id, isArchived: false },
+          where: { workspaceId: publicWs.id, isArchived: false, deletedAt: null },
           select: {
             id: true,
             title: true,
             parentId: true,
             workspaceId: true,
+            contentJson: true,
             updatedAt: true,
             createdById: true,
             createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -85,6 +140,7 @@ docRouter.get(
     const sharedDocs = await prisma.document.findMany({
       where: {
         isArchived: false,
+        deletedAt: null,
         permissions: { some: { userId: req.user!.id } },
         workspace: { ownerId: { not: req.user!.id }, kind: 'PRIVATE' },
       },
@@ -93,6 +149,7 @@ docRouter.get(
         title: true,
         parentId: true,
         workspaceId: true,
+        contentJson: true,
         updatedAt: true,
         createdById: true,
         workspace: { select: { id: true, name: true, ownerId: true } },
@@ -101,16 +158,35 @@ docRouter.get(
       orderBy: { updatedAt: 'desc' },
     });
 
-    const annotateFav = <T extends { id: string }>(arr: T[]) =>
-      arr.map((d) => ({ ...d, isFavorite: favoriteIds.has(d.id) }));
+    const annotateFav = <T extends { id: string; parentId?: string | null; contentJson?: string | null }>(arr: T[]) => {
+      // Older folders were stored as empty documents. A live child is authoritative
+      // evidence that their parent is a folder, even without the newer marker.
+      const parentIds = new Set(arr.map((d) => d.parentId).filter((id): id is string => Boolean(id)));
+      return arr.map((d) => ({
+        ...withFolderFlag(d),
+        isFolder: isFolderContent(d.contentJson) || parentIds.has(d.id),
+        isFavorite: favoriteIds.has(d.id),
+      }));
+    };
+    const mine = annotateFav(mineDocs);
+    const publicDocsWithFav = annotateFav(publicDocs);
+    const shared = annotateFav(sharedDocs);
+    const documentCount = (list: Array<{ isFolder?: boolean }>) =>
+      list.filter((item) => !item.isFolder).length;
 
     res.json({
       workspaces: ownWorkspaces,
       publicWorkspace: publicWs,
-      mine: annotateFav(mineDocs),
-      public: annotateFav(publicDocs),
-      shared: annotateFav(sharedDocs),
+      mine,
+      public: publicDocsWithFav,
+      shared,
       favorites,
+      counts: {
+        mine: documentCount(mine),
+        public: documentCount(publicDocsWithFav),
+        shared: documentCount(shared),
+        favorites: documentCount(favorites),
+      },
     });
   }),
 );
@@ -150,6 +226,7 @@ docRouter.post(
         parentId: z.string().nullable().optional(),
         title: z.string().trim().min(1).max(120).default('未命名文档'),
         contentJson: z.string().max(2_000_000).optional(),
+        isFolder: z.boolean().optional(),
       })
       .parse(req.body);
     let ws;
@@ -167,11 +244,11 @@ docRouter.post(
         workspaceId: ws.id,
         parentId: body.parentId ?? null,
         title: body.title,
-        contentJson: body.contentJson ?? '',
+        contentJson: body.isFolder ? FOLDER_CONTENT : body.contentJson ?? '',
         createdById: req.user!.id,
       },
     });
-    res.json({ doc });
+    res.json({ doc: { ...doc, isFolder: body.isFolder === true } });
   }),
 );
 
@@ -195,10 +272,69 @@ docRouter.post(
     } else {
       ws = await findTargetWorkspace(req.user!.id, workspaceKind ?? 'PRIVATE');
     }
+    const originalName = normalizeFilename(req.file.originalname);
+    const title =
+      originalName.replace(/\.(docx|md|markdown|txt|pdf)$/i, '').slice(0, 120) || '未命名文档';
+    const parentIdRaw = (req.body?.parentId as string | undefined)?.trim();
+    const parentId = parentIdRaw ? parentIdRaw : null;
+    if (parentId) {
+      const parent = await prisma.document.findUnique({
+        where: { id: parentId },
+        select: { id: true, workspaceId: true, deletedAt: true, isArchived: true, contentJson: true },
+      });
+      if (!parent || parent.deletedAt || parent.isArchived) {
+        throw new HttpError(404, '目标文件夹不存在', 'PARENT_NOT_FOUND');
+      }
+      if (parent.workspaceId !== ws.id) {
+        throw new HttpError(400, '目标文件夹不在当前知识库', 'PARENT_WORKSPACE_MISMATCH');
+      }
+    }
+    const doc = await prisma.document.create({
+      data: {
+        workspaceId: ws.id,
+        title,
+        contentJson: '',
+        createdById: req.user!.id,
+        parentId,
+      },
+    });
+    const createdAttachmentIds: string[] = [];
+    const createdStoredNames: string[] = [];
     let html = '';
     try {
-      html = await importByExtension(req.file.path, req.file.originalname);
+      html = await importByExtension(req.file.path, originalName, {
+        persistImage: async (image) => {
+          const stored = await storeUploadBuffer(image.buffer, {
+            subdir: 'attachments',
+            originalName: image.originalName,
+          });
+          createdStoredNames.push(stored.storedName);
+          const att = await prisma.attachment.create({
+            data: {
+              ownerId: req.user!.id,
+              documentId: doc.id,
+              category: 'doc-image',
+              originalName: image.originalName,
+              storedName: stored.storedName,
+              mimeType: image.mimeType,
+              size: image.buffer.length,
+            },
+          });
+          createdAttachmentIds.push(att.id);
+          return `/api/attachments/${att.id}/raw`;
+        },
+      });
     } catch (err) {
+      await prisma.attachment.deleteMany({ where: { id: { in: createdAttachmentIds } } }).catch(() => undefined);
+      await prisma.document.delete({ where: { id: doc.id } }).catch(() => undefined);
+      for (const storedName of createdStoredNames) {
+        try {
+          const abs = resolveUploadPath(storedName);
+          if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
+        } catch {
+          /* ignore */
+        }
+      }
       throw new HttpError(400, (err as Error).message || '解析失败', 'IMPORT_FAILED');
     } finally {
       try {
@@ -207,17 +343,176 @@ docRouter.post(
         /* ignore */
       }
     }
-    const title =
-      req.file.originalname.replace(/\.(docx|md|markdown|txt)$/i, '').slice(0, 120) || '未命名文档';
-    const doc = await prisma.document.create({
-      data: {
-        workspaceId: ws.id,
-        title,
-        contentJson: html,
-        createdById: req.user!.id,
-      },
+    const updated = await prisma.document.update({
+      where: { id: doc.id },
+      data: { contentJson: html },
     });
-    res.json({ doc });
+    res.json({ doc: withFolderFlag(updated) });
+  }),
+);
+
+docRouter.post(
+  '/:id/copy-to-public',
+  asyncHandler(async (req, res) => {
+    const source = await prisma.document.findUnique({
+      where: { id: req.params.id },
+      include: { workspace: true },
+    });
+    if (!source || source.isArchived) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
+    if (source.workspace.kind !== 'PRIVATE' || source.workspace.ownerId !== req.user!.id) {
+      throw new HttpError(403, '只能复制自己的私人知识库文档', 'FORBIDDEN');
+    }
+    const sourceHasChildren = await prisma.document.count({
+      where: { parentId: source.id, isArchived: false, deletedAt: null },
+    });
+    if (isFolderContent(source.contentJson) || sourceHasChildren > 0) {
+      throw new HttpError(400, '文件夹请使用移动到公共知识库', 'FOLDER_COPY_NOT_SUPPORTED');
+    }
+    const publicWs = await findTargetWorkspace(req.user!.id, 'PUBLIC');
+
+    const copiedIds = new Map<string, string>();
+    const copyOne = async (doc: typeof source, targetParentId: string | null): Promise<typeof source> => {
+      const copied = await prisma.document.create({
+        data: {
+          workspaceId: publicWs.id,
+          parentId: targetParentId,
+          title: doc.title,
+          contentJson: doc.contentJson,
+          createdById: req.user!.id,
+        },
+        include: { workspace: true },
+      });
+      copiedIds.set(doc.id, copied.id);
+      const attachmentMap = await copyDocumentAttachments(doc.id, copied.id, req.user!.id);
+      const contentJson = rewriteAttachmentLinks(doc.contentJson, attachmentMap);
+      const updated =
+        contentJson === copied.contentJson
+          ? copied
+          : await prisma.document.update({
+              where: { id: copied.id },
+              data: { contentJson },
+              include: { workspace: true },
+            });
+
+      const children = await prisma.document.findMany({
+        where: { parentId: doc.id, workspaceId: doc.workspaceId, isArchived: false, deletedAt: null },
+        include: { workspace: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+      for (const child of children) {
+        await copyOne(child, copied.id);
+      }
+      return updated;
+    };
+
+    const copied = await copyOne(source, null);
+    res.json({ doc: withFolderFlag(copied), copiedCount: copiedIds.size });
+  }),
+);
+
+// 移动（非复制）私人文档/文件夹到公共知识库。整棵子树一并迁移，私人侧移除，公共侧出现。
+docRouter.post(
+  '/:id/move-to-public',
+  asyncHandler(async (req, res) => {
+    const source = await prisma.document.findUnique({
+      where: { id: req.params.id, deletedAt: null },
+      include: { workspace: true },
+    });
+    if (!source) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
+    // 仅允许私人工作区 owner 移动自己的文档（与 copy-to-public 权限一致）
+    if (source.workspace.kind !== 'PRIVATE' || source.workspace.ownerId !== req.user!.id) {
+      throw new HttpError(403, '只能移动自己的私人知识库文档', 'FORBIDDEN');
+    }
+    const publicWs = await findTargetWorkspace(req.user!.id, 'PUBLIC');
+
+    // 递归收集整棵子树的所有 doc id（含自身）
+    const allIds: string[] = [];
+    const stack = [source.id];
+    const visited = new Set<string>();
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      allIds.push(cur);
+      const children = await prisma.document.findMany({
+        where: { parentId: cur, deletedAt: null },
+        select: { id: true },
+      });
+      children.forEach((c) => stack.push(c.id));
+    }
+
+    // 批量迁移：改 workspaceId 到公共；清理私人协作者权限（公共走 workspace 级权限）
+    await prisma.$transaction([
+      prisma.document.updateMany({
+        where: { id: { in: allIds } },
+        data: { workspaceId: publicWs.id, createdById: req.user!.id },
+      }),
+      prisma.documentPermission.deleteMany({
+        where: { documentId: { in: allIds } },
+      }),
+    ]);
+    if (allIds.length > 1 && !isFolderContent(source.contentJson)) {
+      await prisma.document.update({
+        where: { id: source.id },
+        data: { contentJson: FOLDER_CONTENT },
+      });
+    }
+    // 顶层文档 parentId 置 null（移到公共根目录）；子树内部结构不变
+    const moved = await prisma.document.update({
+      where: { id: source.id },
+      data: { parentId: null },
+      include: { workspace: true },
+    });
+
+    res.json({ doc: withFolderFlag(moved), movedCount: allIds.length });
+  }),
+);
+
+// 管理员可将公共文档或整棵文件夹迁入自己的私人知识库。
+docRouter.post(
+  '/:id/move-to-private',
+  asyncHandler(async (req, res) => {
+    if (req.user!.role !== 'ADMIN') {
+      throw new HttpError(403, '仅管理员可将公共内容转为私密', 'FORBIDDEN');
+    }
+    const source = await prisma.document.findUnique({
+      where: { id: req.params.id, deletedAt: null },
+      include: { workspace: true },
+    });
+    if (!source) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
+    if (source.workspace.kind !== 'PUBLIC') {
+      throw new HttpError(400, '只能将公共知识库内容转为私密', 'NOT_PUBLIC');
+    }
+    const privateWs = await findTargetWorkspace(req.user!.id, 'PRIVATE');
+
+    const allIds: string[] = [];
+    const stack = [source.id];
+    const visited = new Set<string>();
+    while (stack.length) {
+      const currentId = stack.pop()!;
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+      allIds.push(currentId);
+      const children = await prisma.document.findMany({
+        where: { parentId: currentId, workspaceId: source.workspaceId, deletedAt: null },
+        select: { id: true },
+      });
+      children.forEach((child) => stack.push(child.id));
+    }
+
+    await prisma.$transaction([
+      prisma.document.updateMany({
+        where: { id: { in: allIds } },
+        data: { workspaceId: privateWs.id, createdById: req.user!.id },
+      }),
+      prisma.documentPermission.deleteMany({ where: { documentId: { in: allIds } } }),
+      prisma.document.update({ where: { id: source.id }, data: { parentId: null } }),
+    ]);
+    const moved = await prisma.document.findUniqueOrThrow({
+      where: { id: source.id },
+      include: { workspace: true },
+    });
+    res.json({ doc: withFolderFlag(moved), movedCount: allIds.length });
   }),
 );
 
@@ -225,7 +520,14 @@ docRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const { doc, access } = await loadDocWithAccess(req.user!, req.params.id);
-    res.json({ doc, role: access.role, access });
+    const hasChildren = await prisma.document.count({
+      where: { parentId: doc.id, isArchived: false, deletedAt: null },
+    });
+    res.json({
+      doc: { ...withFolderFlag(doc), isFolder: isFolderContent(doc.contentJson) || hasChildren > 0 },
+      role: access.role,
+      access,
+    });
   }),
 );
 
@@ -240,8 +542,13 @@ docRouter.patch(
         contentJson: z.string().max(2_000_000).optional(),
         parentId: z.string().nullable().optional(),
         isArchived: z.boolean().optional(),
+        // 乐观锁：客户端加载文档时记录的 updatedAt。不匹配表示文档已被他人修改。
+        expectedUpdatedAt: z.string().datetime().optional(),
+        // 用户在冲突面板确认后强制覆盖，跳过乐观锁检查。
+        force: z.boolean().optional(),
       })
       .parse(req.body);
+    const { expectedUpdatedAt, force, ...writeFields } = body;
     if (body.parentId !== undefined && body.parentId !== null) {
       if (body.parentId === doc.id) {
         throw new HttpError(400, '不能将文档移动到自身', 'INVALID_PARENT');
@@ -275,8 +582,24 @@ docRouter.patch(
         });
       }
     }
-    const updated = await prisma.document.update({ where: { id: doc.id }, data: body });
-    res.json({ doc: updated });
+    // 乐观锁：force=true 跳过版本检查（用户已在冲突面板确认覆盖）；
+    // 否则把 expectedUpdatedAt 加入 where，不匹配时 Prisma 抛 P2025（记录未找到）= 文档已被他人修改。
+    const versionGuard = !force && expectedUpdatedAt ? { updatedAt: new Date(expectedUpdatedAt) } : {};
+    let updated;
+    try {
+      updated = await prisma.document.update({ where: { id: doc.id, ...versionGuard }, data: writeFields });
+    } catch (e: unknown) {
+      if (force || !expectedUpdatedAt) throw e;
+      const code = (e as { code?: string }).code;
+      if (code !== 'P2025') throw e;
+      // 冲突：返回服务端最新文档，供前端做差异对比
+      const latest = await prisma.document.findUniqueOrThrow({
+        where: { id: doc.id },
+        include: { workspace: true },
+      });
+      throw new HttpError(409, '文档已被他人修改，请先查看最新版本', 'DOC_CONFLICT', { doc: latest });
+    }
+    res.json({ doc: withFolderFlag(updated) });
   }),
 );
 
@@ -285,7 +608,29 @@ docRouter.delete(
   asyncHandler(async (req, res) => {
     const { doc, access } = await loadDocWithAccess(req.user!, req.params.id);
     if (!access.canDelete) throw new HttpError(403, '没有删除权限', 'FORBIDDEN');
-    await prisma.document.delete({ where: { id: doc.id } });
+    // 公共知识库文档做软删除（进回收站，admin 可恢复）；私人文档仍硬删除。
+    if (doc.workspace.kind === 'PUBLIC') {
+      const now = new Date();
+      // 递归软删除整棵子树（含子文件夹/子文档），避免 parentId 指向已删父节点导致树断裂
+      const stack: string[] = [doc.id];
+      const visited = new Set<string>();
+      while (stack.length) {
+        const currentId = stack.pop()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        const children = await prisma.document.findMany({
+          where: { parentId: currentId, deletedAt: null },
+          select: { id: true },
+        });
+        children.forEach((c) => stack.push(c.id));
+        await prisma.document.updateMany({
+          where: { id: currentId, deletedAt: null },
+          data: { deletedAt: now, deletedById: req.user!.id },
+        });
+      }
+    } else {
+      await prisma.document.delete({ where: { id: doc.id } });
+    }
     res.json({ ok: true });
   }),
 );
@@ -312,13 +657,24 @@ docRouter.get(
       return;
     }
     if (format === 'docx') {
-      const buf = await htmlToDocx(html, doc.title);
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      );
-      res.setHeader('Content-Disposition', contentDispositionAttachment(`${safeTitle}.docx`));
-      res.send(buf);
+      const origin = `${req.protocol}://${req.get('host')}`;
+      try {
+        const buf = await htmlToDocx(html, doc.title, origin);
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        res.setHeader('Content-Disposition', contentDispositionAttachment(`${safeTitle}.docx`));
+        res.send(buf);
+      } catch {
+        // html-to-docx 库对部分 HTML 结构会崩溃且无法穷举处理。
+        // 兜底降级：导出 Word 兼容的 HTML（.doc 扩展名，Word/WPS 均可直接打开编辑），
+        // 保证用户永远能拿到文件而不是 500 报错。
+        const fallback = htmlToFullPage(html, doc.title);
+        res.setHeader('Content-Type', 'application/msword');
+        res.setHeader('Content-Disposition', contentDispositionAttachment(`${safeTitle}.doc`));
+        res.send(fallback);
+      }
       return;
     }
     throw new HttpError(400, '不支持的导出格式', 'INVALID_FORMAT');
@@ -382,7 +738,7 @@ docRouter.post(
       where: { id: doc.id },
       data: { title: version.title, contentJson: version.contentJson },
     });
-    res.json({ doc: updated });
+    res.json({ doc: withFolderFlag(updated) });
   }),
 );
 
@@ -574,6 +930,7 @@ docRouter.get(
       where: {
         workspaceId: q.workspaceId ? q.workspaceId : { in: wsIds },
         isArchived: false,
+        deletedAt: null,
         ...(q.q ? { title: { contains: q.q } } : {}),
       },
       orderBy: { updatedAt: 'desc' },

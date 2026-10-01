@@ -6,13 +6,68 @@ interface Props {
   headings: EditorHeading[];
 }
 
+const EDITOR_HEADING_SELECTOR = '.rich-editor .ProseMirror h1,.rich-editor .ProseMirror h2,.rich-editor .ProseMirror h3,.rich-editor .ProseMirror h4,.rich-editor .ProseMirror h5,.rich-editor .ProseMirror h6';
+
+function getEditorHeadingElements(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(EDITOR_HEADING_SELECTOR)).filter(
+    (element) => !!element.textContent?.trim(),
+  );
+}
+
+function resolveHeadingElement(headings: EditorHeading[], heading: EditorHeading, index: number): HTMLElement | null {
+  const byId = document.getElementById(heading.id);
+  if (byId?.matches(EDITOR_HEADING_SELECTOR)) return byId;
+
+  const candidates = getEditorHeadingElements();
+  const matching = candidates.filter(
+    (element) =>
+      Number(element.tagName.slice(1)) === heading.level &&
+      element.textContent?.trim() === heading.text,
+  );
+  const occurrence = headings
+    .slice(0, index)
+    .filter((item) => item.level === heading.level && item.text === heading.text).length;
+  const target = matching[occurrence] ?? candidates[index] ?? null;
+  if (target) target.id = heading.id;
+  return target;
+}
+
+const HEADING_SCROLL_OFFSET = 96;
+
+function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
+  let parent = element.parentElement;
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY);
+    if (canScrollY && parent.scrollHeight > parent.clientHeight) {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+function scrollHeadingIntoView(target: HTMLElement) {
+  const container = findScrollableAncestor(target);
+  if (!container) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const top =
+    container.scrollTop + targetRect.top - containerRect.top - HEADING_SCROLL_OFFSET;
+  container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
 export function DocumentToc({ headings }: Props) {
   const [activeId, setActiveId] = useState('');
 
   useEffect(() => {
     if (headings.length === 0) return;
     const elements = headings
-      .map((heading) => document.getElementById(heading.id))
+      .map((heading, index) => resolveHeadingElement(headings, heading, index))
       .filter((node): node is HTMLElement => !!node);
     if (elements.length === 0) return;
 
@@ -34,16 +89,18 @@ export function DocumentToc({ headings }: Props) {
   if (headings.length === 0) return null;
 
   const jumpTo = (id: string) => {
-    const target = document.getElementById(id);
+    const index = headings.findIndex((heading) => heading.id === id);
+    const target =
+      index >= 0 ? resolveHeadingElement(headings, headings[index], index) : document.getElementById(id);
     if (!target) return;
     setActiveId(id);
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollHeadingIntoView(target);
     window.history.replaceState(null, '', `#${id}`);
   };
 
   return (
     <aside className="no-print hidden xl:block">
-      <div className="sticky top-4 rounded-2xl border border-black/5 bg-white/75 p-4 shadow-sm backdrop-blur">
+      <div className="sticky top-4 rounded-2xl border border-black/5 bg-surface-container-lowest/80 p-4 shadow-sm backdrop-blur">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
           <ListTree size={16} className="text-liquid-indigo" />
           目录

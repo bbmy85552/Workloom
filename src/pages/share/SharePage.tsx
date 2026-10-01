@@ -8,6 +8,18 @@ import { RichEditor } from '../../editor/Editor';
 import { DocumentToc } from '../../components/docs/DocumentToc';
 import type { TableField, TableRecord } from '../../lib/types';
 import type { EditorHeading } from '../../editor/Editor';
+import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
+
+function appendShareTokenToUrls(contentJson: string, token: string): string {
+  return contentJson.replace(
+    /\/api\/attachments\/([^\/"'?\s]+)\/raw(\?[^"'\s]*)?/g,
+    (_full, id: string, qs?: string) => {
+      if (qs && /(?:^|[?&])st=/.test(qs)) return `/api/attachments/${id}/raw${qs}`;
+      if (qs) return `/api/attachments/${id}/raw${qs}&st=${encodeURIComponent(token)}`;
+      return `/api/attachments/${id}/raw?st=${encodeURIComponent(token)}`;
+    },
+  );
+}
 
 interface SharePayload {
   resourceType: 'doc' | 'table';
@@ -34,13 +46,25 @@ export function SharePage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [headings, setHeadings] = useState<EditorHeading[]>([]);
+  const [brandName, setBrandName] = useState(DEFAULT_PUBLIC_SETTINGS.brandName);
 
   useEffect(() => {
     if (!token) return;
     (async () => {
       try {
-        const { data } = await api.get<SharePayload>(`/share/${token}`);
-        setData(data);
+        const [shareRes, settings] = await Promise.all([
+          api.get<SharePayload>(`/share/${token}`),
+          fetchPublicSettings().catch(() => DEFAULT_PUBLIC_SETTINGS),
+        ]);
+        const payload = shareRes.data;
+        if (token && payload.doc?.contentJson) {
+          payload.doc = {
+            ...payload.doc,
+            contentJson: appendShareTokenToUrls(payload.doc.contentJson, token),
+          };
+        }
+        setData(payload);
+        setBrandName(settings.brandName);
       } catch (err) {
         setErrorMsg(asApiError(err).error);
       } finally {
@@ -74,7 +98,7 @@ export function SharePage() {
           <div className="text-base font-semibold text-text-primary mb-2">无法打开分享内容</div>
           <p className="text-sm text-text-secondary mb-4">{errorMsg}</p>
           <Link
-            to="/login"
+            to={`/login?next=${encodeURIComponent(`/share/${token}`)}`}
             className="inline-flex items-center gap-1 text-sm text-liquid-indigo hover:underline"
           >
             <LogIn size={14} /> 返回登录页
@@ -91,7 +115,7 @@ export function SharePage() {
       <header className="border-b border-black/5 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-3">
           <Link to="/" className="text-sm font-semibold text-text-primary">
-            简记
+            {brandName}
           </Link>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-text-secondary">
