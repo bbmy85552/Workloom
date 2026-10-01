@@ -15,6 +15,9 @@ const MODEL_KEYS = [
   ['documentFavorites', 'documentFavorite'],
   ['documentPermissions', 'documentPermission'],
   ['documentVersions', 'documentVersion'],
+  ['memoryProjects', 'memoryProject'],
+  ['memoryProjectPermissions', 'memoryProjectPermission'],
+  ['memoryItems', 'memoryItem'],
   ['tableBases', 'tableBase'],
   ['tablePermissions', 'tablePermission'],
   ['tableFields', 'tableField'],
@@ -39,6 +42,9 @@ const MODEL_KEYS = [
 ] as const;
 
 const DELETE_ORDER = [
+  'memoryItem',
+  'memoryProjectPermission',
+  'memoryProject',
   'calendarReminderLog',
   'documentComment',
   'mailMessage',
@@ -104,6 +110,9 @@ const CREATE_ORDER = [
   'mailMessage',
   'documentComment',
   'calendarReminderLog',
+  'memoryProject',
+  'memoryProjectPermission',
+  'memoryItem',
 ] as const;
 
 const KEY_BY_DELEGATE = new Map<string, string>(MODEL_KEYS.map(([key, delegate]) => [delegate, key]));

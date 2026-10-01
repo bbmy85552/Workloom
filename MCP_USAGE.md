@@ -16,14 +16,22 @@ https://company.2dqy.com/mcp
 http://127.0.0.1:4000/mcp
 ```
 
-MCP 使用 Streamable HTTP transport，请在客户端里选择远程 HTTP/Streamable HTTP 类型。
+MCP 使用 Streamable HTTP transport（无状态，仅 POST），请在客户端里选择远程 HTTP/Streamable HTTP 类型。
+
+另有一个**只包含项目记忆工具**的入口，工具列表更短，推荐日常 AI 对话 / 编码使用：
+
+```text
+https://company.2dqy.com/mcp/memory
+```
+
+两个入口使用同一个 API Key、同一套权限；`/mcp` 同时包含文档、数据表和项目记忆全部工具。
 
 ## 获取 API Key
 
 登录 docs-platform 后进入：
 
 ```text
-设置 -> 密码与邮箱 -> AI / CLI API Key
+设置 -> AI 与 CLI（/app/settings/cli）
 ```
 
 在这里可以生成、重建或删除 API Key。
@@ -48,9 +56,51 @@ Authorization: Bearer jj_live_xxx
 - 私人文档只允许本人和协作者访问。
 - 公共文档按系统公共知识库权限访问。
 - 数据表遵循 owner/editor/viewer 权限。
+- 项目记忆与知识库权限一致：私人项目仅本人和协作者可访问；公共项目所有登录用户可查看，创建者 / 管理员 / 被邀请为可编辑的用户可写。
 - 公共文档删除会进入回收站，不会绕过现有保护。
 
 ## 客户端配置示例
+
+### Cursor（`~/.cursor/mcp.json` 或项目内 `.cursor/mcp.json`）
+
+```json
+{
+  "mcpServers": {
+    "jianji-memory": {
+      "url": "https://company.2dqy.com/mcp/memory",
+      "headers": { "Authorization": "Bearer jj_live_xxx" }
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add --transport http jianji-memory https://company.2dqy.com/mcp/memory \
+  --header "Authorization: Bearer jj_live_xxx"
+```
+
+### Claude Desktop（`claude_desktop_config.json`，需本机安装 Node.js，改完重启）
+
+```json
+{
+  "mcpServers": {
+    "jianji-memory": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://company.2dqy.com/mcp/memory", "--header", "Authorization:${JIANJI_AUTH}"],
+      "env": { "JIANJI_AUTH": "Bearer jj_live_xxx" }
+    }
+  }
+}
+```
+
+### Claude 网页版 / ChatGPT 网页版
+
+- Claude 网页版：设置 → 连接器 → 添加自定义连接器，填 `https://company.2dqy.com/mcp/memory`，在高级设置的请求头中填 `Authorization: Bearer jj_live_xxx`（Anthropic 标注为 Beta，且是组织共用凭证）。
+- ChatGPT 网页版（开发者模式）目前只支持 OAuth / 无认证，本阶段未实现 OAuth，暂不能直连；请在项目记忆页面使用「复制全部记忆」。
+
+### 通用格式
 
 不同 MCP 客户端的配置界面不同，但核心信息相同：
 
@@ -140,6 +190,28 @@ user
 attachment
 formula
 ```
+
+### 项目记忆
+
+```text
+memory_projects_list
+memory_project_create
+memory_get
+memory_add
+memory_update
+memory_delete
+memory_search
+```
+
+- `memory_projects_list`：列出可访问的项目，`scope` 为 `mine`、`public`、`shared`、`all`。
+- `memory_project_create`：新建项目，`visibility` 为 `private`（默认）或 `public`（团队所有人可见）。
+- `memory_get`：**开始项目工作前调用**。以 Markdown 返回项目信息和全部置顶记忆（含条目 id）；`includeUnpinned: true` 时包含未置顶条目。
+- `memory_add`：写入一条记忆，`kind` 为 `fact`（事实）、`decision`（决策）、`preference`（偏好）、`note`（笔记）、`todo`（待办），可带 `title`、`tags`、`pinned`、`source`。
+- `memory_update` / `memory_delete`：按 `itemId` 修改或删除（软删除）。
+- `memory_search`：按关键字搜索标题 / 内容 / 标签，可限定 `projectId`、`kind`。
+- 涉及项目的工具都可以用 `projectId`，也可以直接传唯一的 `projectName`。
+
+网页端：左侧导航「项目记忆」可管理项目和条目、邀请协作者，并提供「复制全部记忆」（Markdown），方便粘贴到不支持 MCP 的平台。
 
 ### 数据表记录
 
@@ -242,7 +314,7 @@ npm run docs-platform -- tables list
 
 如果客户端无法连接：
 
-1. 确认 MCP 地址是 `https://company.2dqy.com/mcp`。
+1. 确认 MCP 地址是 `https://company.2dqy.com/mcp` 或 `https://company.2dqy.com/mcp/memory`。
 2. 确认请求带了 `Authorization: Bearer jj_live_xxx`。
 3. 确认 API Key 没有被重建或删除。
 4. 先用 `tools/list` 测试是否能列出工具。

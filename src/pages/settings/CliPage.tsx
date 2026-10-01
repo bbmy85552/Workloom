@@ -13,6 +13,7 @@ interface CliApiKeyInfo {
 }
 
 const MCP_URL = 'https://company.2dqy.com/mcp';
+const MEMORY_MCP_URL = 'https://company.2dqy.com/mcp/memory';
 const BASE_URL = 'https://company.2dqy.com';
 
 function formatDate(value?: string | null) {
@@ -69,6 +70,39 @@ export function CliPage() {
       ),
     [activeKey],
   );
+
+  const memoryCursorConfig = JSON.stringify(
+    {
+      mcpServers: {
+        'jianji-memory': {
+          url: MEMORY_MCP_URL,
+          headers: { Authorization: `Bearer ${activeKey}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+
+  const memoryClaudeDesktopConfig = JSON.stringify(
+    {
+      mcpServers: {
+        'jianji-memory': {
+          command: 'npx',
+          args: ['-y', 'mcp-remote', MEMORY_MCP_URL, '--header', 'Authorization:${JIANJI_AUTH}'],
+          env: { JIANJI_AUTH: `Bearer ${activeKey}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+
+  const memoryClaudeCode = `claude mcp add --transport http jianji-memory ${MEMORY_MCP_URL} \\
+  --header "Authorization: Bearer ${activeKey}"`;
+
+  const memoryPrompt = `开始任何项目相关工作前，先调用 jianji-memory 的 memory_projects_list 找到项目，再调用 memory_get 读取全部置顶记忆并遵循。
+工作中确定了新的事实、决策或我的偏好时，用 memory_add 记录；发现记忆过时用 memory_update / memory_delete 修正。不要记录密码或密钥。`;
 
   const curlExample = `curl ${MCP_URL} \\
   -H "Authorization: Bearer ${activeKey}" \\
@@ -225,6 +259,39 @@ npm run docs-platform -- tables list`;
           </Field>
         </section>
 
+        <section className="space-y-4 border-b border-black/10 pb-8">
+          <div>
+            <div className="text-sm font-semibold text-text-primary mb-2">项目记忆 MCP</div>
+            <p className="text-xs text-text-secondary">
+              只包含项目记忆工具（memory_projects_list / memory_get / memory_add / memory_update / memory_delete /
+              memory_search / memory_project_create），工具列表更短，适合日常 AI 编码与对话。使用同一个 API Key，
+              权限与网页「项目记忆」一致。
+            </p>
+          </div>
+          <Field label="项目记忆 MCP 地址">
+            <CodeBlock value={MEMORY_MCP_URL} />
+          </Field>
+          <Field label="Cursor（~/.cursor/mcp.json 或项目 .cursor/mcp.json）">
+            <CodeBlock value={memoryCursorConfig} />
+          </Field>
+          <Field label="Claude Code（终端执行）">
+            <CodeBlock value={memoryClaudeCode} />
+          </Field>
+          <Field
+            label="Claude Desktop（claude_desktop_config.json，需要本机已安装 Node.js）"
+            hint="通过 mcp-remote 转接远程 MCP；修改后需重启 Claude Desktop。"
+          >
+            <CodeBlock value={memoryClaudeDesktopConfig} />
+          </Field>
+          <Field label="建议加到 AI 的自定义指令 / 项目规则">
+            <CodeBlock value={memoryPrompt} />
+          </Field>
+          <div className="rounded-xl border border-black/10 bg-surface-container-low p-4 text-xs leading-6 text-text-secondary">
+            Claude 网页版可在「设置 → 连接器 → 添加自定义连接器」填写上方地址，并在高级设置的请求头中填写
+            Authorization（Beta，组织共用一个凭证）。ChatGPT 网页版目前需要 OAuth，暂不支持 API Key 连接，可在项目记忆页面点击「复制全部记忆」后粘贴使用。
+          </div>
+        </section>
+
         <section className="space-y-4">
           <div>
             <div className="text-sm font-semibold text-text-primary mb-2">本地 CLI</div>
@@ -236,7 +303,7 @@ npm run docs-platform -- tables list`;
             <CodeBlock value={cliExample} />
           </Field>
           <div className="rounded-xl border border-black/10 bg-surface-container-low p-4 text-xs leading-6 text-text-secondary">
-            API Key 会以当前用户身份访问文档和数据表。不要把 API Key 写入公开仓库、截图或共享文档。
+            API Key 会以当前用户身份访问文档、数据表和项目记忆。不要把 API Key 写入公开仓库、截图或共享文档。
           </div>
         </section>
       </div>

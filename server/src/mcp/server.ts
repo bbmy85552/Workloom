@@ -4,6 +4,7 @@ import { prisma } from '../prisma.js';
 import type { AuthedUser } from '../middleware/auth.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
 import { HttpError } from '../lib/asyncHandler.js';
+import { MEMORY_MCP_INSTRUCTIONS, registerMemoryTools } from './memoryTools.js';
 
 const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
 const FIELD_TYPES = [
@@ -80,11 +81,24 @@ function assertWrite(ctx: { canWrite: boolean }) {
   if (!ctx.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
 }
 
+async function assertRecordInTable(tableId: string, recordId: string) {
+  const record = await prisma.tableRecord.findFirst({ where: { id: recordId, tableId }, select: { id: true } });
+  if (!record) throw new HttpError(404, '记录不存在', 'RECORD_NOT_FOUND');
+}
+
+async function assertFieldInTable(tableId: string, fieldId: string) {
+  const field = await prisma.tableField.findFirst({ where: { id: fieldId, tableId }, select: { id: true } });
+  if (!field) throw new HttpError(404, '字段不存在', 'FIELD_NOT_FOUND');
+}
+
 export function createDocsPlatformMcpServer(user: AuthedUser) {
-  const server = new McpServer({
-    name: 'docs-platform',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'docs-platform',
+      version: '0.1.0',
+    },
+    { instructions: MEMORY_MCP_INSTRUCTIONS },
+  );
 
   server.registerTool(
     'docs_platform_me',
@@ -429,6 +443,7 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     async ({ tableId, fieldId, name, options }) => {
       const ctx = await loadTable(user.id, tableId);
       assertWrite(ctx);
+      await assertFieldInTable(ctx.table.id, fieldId);
       const field = await prisma.tableField.update({
         where: { id: fieldId },
         data: { name, options: options === undefined ? undefined : JSON.stringify(options) },
@@ -447,6 +462,7 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     async ({ tableId, fieldId }) => {
       const ctx = await loadTable(user.id, tableId);
       assertWrite(ctx);
+      await assertFieldInTable(ctx.table.id, fieldId);
       await prisma.tableField.delete({ where: { id: fieldId } });
       return jsonContent({ ok: true });
     },
@@ -480,6 +496,7 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     async ({ tableId, recordId, data }) => {
       const ctx = await loadTable(user.id, tableId);
       assertWrite(ctx);
+      await assertRecordInTable(ctx.table.id, recordId);
       const record = await prisma.tableRecord.update({
         where: { id: recordId },
         data: { dataJson: JSON.stringify(data) },
@@ -498,10 +515,13 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     async ({ tableId, recordId }) => {
       const ctx = await loadTable(user.id, tableId);
       assertWrite(ctx);
+      await assertRecordInTable(ctx.table.id, recordId);
       await prisma.tableRecord.delete({ where: { id: recordId } });
       return jsonContent({ ok: true });
     },
   );
+
+  registerMemoryTools(server, user);
 
   return server;
 }

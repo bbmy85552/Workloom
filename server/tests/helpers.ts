@@ -19,6 +19,9 @@ export async function getApp() {
 export async function resetData() {
   __testCodeMap.clear();
   await prisma.apiKey.deleteMany({});
+  await prisma.memoryItem.deleteMany({});
+  await prisma.memoryProjectPermission.deleteMany({});
+  await prisma.memoryProject.deleteMany({});
   await prisma.session.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.shareLink.deleteMany({});

@@ -16,6 +16,8 @@ import { CalendarPage } from '../pages/calendar/CalendarPage';
 import { MailPage } from '../pages/mail/MailPage';
 import { OaPage } from '../pages/oa/OaPage';
 import { RecentPage } from '../pages/recent/RecentPage';
+import { MemoryListPage } from '../pages/memory/MemoryListPage';
+import { MemoryDetailPage } from '../pages/memory/MemoryDetailPage';
 import { ProfilePage } from '../pages/settings/ProfilePage';
 import { SecurityPage } from '../pages/settings/SecurityPage';
 import { CliPage } from '../pages/settings/CliPage';
@@ -61,6 +63,8 @@ export const router = createBrowserRouter([
           { path: 'docs/:id', element: <DocDetailPage /> },
           { path: 'tables', element: <TablesListPage /> },
           { path: 'tables/:id', element: <TableDetailPage /> },
+          { path: 'memory', element: <MemoryListPage /> },
+          { path: 'memory/:id', element: <MemoryDetailPage /> },
           { path: 'calendar', element: <CalendarPage /> },
           { path: 'mail', element: <MailPage /> },
           { path: 'recent', element: <RecentPage /> },
