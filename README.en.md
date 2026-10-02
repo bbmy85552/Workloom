@@ -1,31 +1,45 @@
-# Jianji
+# Workloom
 
-<p align="center">
-  <img src="public/logo.svg" width="88" alt="Jianji logo" />
-</p>
+A self-hosted collaborative workspace for knowledge, documents, structured tables, schedules and email.
 
-<p align="center">
-  A lightweight, self-hosted, multi-device open-source knowledge workspace.
-</p>
+[简体中文](README.md) · [English](README.en.md) · [Deployed instance](https://company.2dqy.com) · [MCP and CLI guide](MCP_USAGE.md)
 
-<p align="center">
-  <a href="README.md">简体中文</a>
-  ·
-  <a href="README.en.md">English</a>
-</p>
+Workloom is developed by [bbmy85552](https://github.com/bbmy85552) from the open-source [Jianji](https://github.com/staklab/jianji) project for personal knowledge organization and small-team collaboration. Its development spans document organization, batch imports, editing and layout, shared-document saves, team access, branding, OA integration and a document trash. MCP and the CLI provide external access to this workspace.
 
-<p align="center">
-  <a href="https://github.com/staklab/jianji/releases"><img alt="Version" src="https://img.shields.io/badge/version-0.1.0-5E5CE6"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20Docker%20%7C%20macOS-lightgrey">
-  <img alt="Built with React and Express" src="https://img.shields.io/badge/built%20with-React%20%2B%20Express-61DAFB">
-  <img alt="Database" src="https://img.shields.io/badge/database-SQLite-003B57">
-  <img alt="Deploy" src="https://img.shields.io/badge/deploy-Docker%20Compose-2496ED">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-</p>
+## Workloom development and extensions
 
-Jianji brings documents, structured tables, calendars, mail aggregation, notifications, sharing, collaboration, and admin operations into one self-hosted workspace. It is designed for personal servers, home labs, small teams, and anyone who wants to own their data.
+| Area | Additions and improvements |
+| --- | --- |
+| Knowledge organization | Explicit folders, path navigation, folder grids and drag-and-drop organization; copy your own private non-folder documents into public space, move private documents or folder trees into public space, and let administrators move public content into their own private space |
+| Batch imports and file handling | Batch DOCX, Markdown and TXT imports with sequential processing, progress and failure feedback; improved imported-image attachment storage and references, plus DOCX image and table export compatibility |
+| Reading and editing | Heading navigation on larger screens, clipboard image pasting, Markdown-to-rich-text pasting, and improvements to read-only documents and shared pages |
+| Tables and forms | User-triggered layout for document tables, an optional content-based width and alignment mode for data tables, and fixes for public-form select options |
+| Shared-document saves | Save-version checks, side-by-side conflict comparison and version selection, queued saves and fixes for false conflicts during consecutive edits; shared links return to their original location after sign-in |
+| Team access and branding | Google sign-in, invitation-code registration, and consistent brand and company names across the interface, authentication pages and system emails |
+| OA integration | A configurable sidebar entry that embeds an external OA system, with an option to open it in a new window |
+| Public-document trash | Soft deletion of public documents and their descendants; administrators can restore a selected document and its required parent chain or permanently delete items; private documents are still deleted directly |
+| External tools | User API keys, remote MCP, a CLI and a dedicated settings page, with account permissions applied to document and table access |
 
-## Preview
+These extensions build on the upstream document, table, calendar, email and administration modules. Concurrent document edits use conflict detection and version selection, without automatic merging. OA integration embeds a separate system.
+
+## Workspace capabilities
+
+| Module | Capabilities |
+| --- | --- |
+| Documents | Private, public, shared and favorite views; document hierarchies and folders; TipTap rich text; attachments; imports and exports; comments, sharing and version recovery |
+| Tables | Fields and templates; grid, kanban, calendar and Gantt views; formulas; CSV import; CSV/XLSX export; public forms |
+| Dashboard and calendar | Tasks, recent documents and schedules; month/week/day views; recurring events; in-app and email reminders |
+| Email | IMAP/SMTP accounts, folder synchronization, in-app composition and attachments, mail-to-task workflows |
+| Team administration | Users, groups, sessions, registration settings, Google sign-in, branding, OA and a public-document trash |
+| Self-hosting | React, Express, TipTap and SQLite; Docker Compose deployment; backup, recovery and migration |
+
+## Deployed instance and repository version
+
+The [deployed instance](https://company.2dqy.com) requires sign-in and applies account permissions to content access. It also shows project memory for facts, decisions and preferences, with personal, public and shared-project entry points and a dedicated memory MCP interface. **That module is not yet included in this public repository.** For the document and table MCP tools available when deploying this repository, see [MCP_USAGE.md](MCP_USAGE.md).
+
+## Base-module previews
+
+The following four images are inherited upstream screenshots of the base modules. See the extensions above and the current source for Workloom-specific functionality.
 
 <table>
   <tr>
@@ -46,34 +60,25 @@ Jianji brings documents, structured tables, calendars, mail aggregation, notific
   </tr>
 </table>
 
-## Highlights
-
-| Area | Features |
-| --- | --- |
-| Documents | Private/public/shared/favorite views, tree and grid layouts, TipTap rich text, attachments, export, comments, and version restore |
-| Tables | Custom fields, templates, table/kanban/calendar/Gantt views, formulas, CSV/XLSX import and export, and public forms |
-| Calendar | Month/week/day views, recurring events, todo scheduling, in-app and email reminders |
-| Mail | IMAP/SMTP binding, folder sync, in-app compose, attachments, sent cache, and mail-to-todo |
-| Users and security | Email-code registration, password reset, email change, login history, remote session revocation, and admin user control |
-| Preferences | Dark mode, custom theme color palette, default home page, editor font size, mail sync preferences, and font management |
-| Admin console | Users, groups, system settings, SMTP test mail, backup/restore, audit logs, and version updates |
-| Self-hosting | One-container Docker Compose, SQLite volume, same-origin `/api`, one-click install, safe updates, and full migration packages |
-
 ## Quick Deploy
 
-Docker Compose is the recommended production setup. The installer generates `.env`, a strong `JWT_SECRET`, a private first-run setup link, and starts the container. The administrator account, SMTP settings, and registration policy are configured in the web setup wizard.
+Docker Compose is the recommended production setup. A working SMTP configuration is required to complete first-run setup. The installer generates `.env`, a strong `JWT_SECRET`, a private first-run setup link, and starts the container. The administrator account, SMTP settings, and registration policy are configured in the web setup wizard.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/staklab/jianji/main/scripts/install.sh | bash -s -- \
-  --app-url https://jianji.example.com \
+curl -fsSL https://raw.githubusercontent.com/bbmy85552/Workloom/main/scripts/install.sh | bash -s -- \
+  --repo https://github.com/bbmy85552/Workloom.git \
+  --dir Workloom \
+  --app-url https://workloom.example.com \
   --yes
 ```
+
+The `--repo` argument explicitly selects Workloom. The installer retains an upstream default for compatibility, so keep this argument.
 
 You can also clone first:
 
 ```bash
-git clone https://github.com/staklab/jianji.git
-cd jianji
+git clone https://github.com/bbmy85552/Workloom.git
+cd Workloom
 bash scripts/install.sh
 ```
 
@@ -89,7 +94,13 @@ For environment variables, SMTP, Nginx, certificates, and migration details, see
 
 ## Updates
 
-Jianji does not require GitHub Releases for updates. By default, the admin version panel reads the latest commit on GitHub `main`; deployed instances write their current commit to `.env`, so a push to `main` is enough for instances to detect a newer build.
+Workloom checks GitHub branch commits for updates. When deployed using the commands above, the installer writes the update repository, branch and current commit from the Git checkout. For manual deployments, explicitly set the Workloom update source in `.env`; compatibility defaults still point to upstream:
+
+```env
+JIANJI_UPDATE_REPO=https://github.com/bbmy85552/Workloom.git
+JIANJI_UPDATE_BRANCH=main
+JIANJI_UPDATE_CHECK_URL=https://api.github.com/repos/bbmy85552/Workloom/commits/main
+```
 
 Safe server update:
 
@@ -114,9 +125,27 @@ bash scripts/push-update.sh --host root@example.com --dir /opt/jianji --runtime
 
 Push updates sync source over SSH/rsync and ask the server to skip remote fetching before rebuilding safely. The server-side `.env`, setup link, certificates, database, uploads, and backups are preserved.
 
-## Local Development
+## AI and command-line access
+
+Generate a user API key under **Settings → AI and CLI**. Remote MCP uses Streamable HTTP at `https://your-domain/mcp` with `Authorization: Bearer <API Key>`. The current settings page uses the deployed instance in its examples; replace that address with your own domain when self-hosting.
+
+The CLI retains its existing command and environment variable names:
 
 ```bash
+export DOCS_PLATFORM_BASE_URL="https://workloom.example.com"
+export DOCS_PLATFORM_API_KEY="<your API key>"
+npm run docs-platform -- docs list
+npm run docs-platform -- tables list
+```
+
+See [MCP_USAGE.md](MCP_USAGE.md) for tools, parameters and client configuration. Configure Google sign-in with `NEXT_PUBLIC_GOOGLE_CLIENT_ID`; invitation codes, branding and the OA URL are configured in the admin console. New registrations require a valid invitation code even when registration is enabled.
+
+## Local Development
+
+On a fresh clone, create `server/.env` and edit the configuration before installing dependencies. Keep any existing environment file.
+
+```bash
+cp -n server/.env.example server/.env
 npm run setup
 npm run dev
 ```
@@ -138,6 +167,8 @@ npm run build
 
 ## Data And Security
 
+The `jianji` service, `jianji:*` image names, `JIANJI_*` settings and volume names are retained for deployment compatibility. Existing instances should keep their deployment directory and Compose project name to continue using the same data volumes.
+
 Docker deployment uses two persistent volumes:
 
 | Volume | Content |
@@ -149,4 +180,4 @@ The repository and Docker build context exclude `.env`, `SETUP_URL.txt`, SQLite 
 
 ## License
 
-Jianji application code is open sourced under the [MIT License](LICENSE). Bundled font references follow their own OFL licenses; see [LICENSES/FONTS.md](LICENSES/FONTS.md).
+Workloom builds on [staklab/jianji](https://github.com/staklab/jianji), preserves the original attribution, and continues to use the [MIT License](LICENSE). Bundled font references follow their own OFL licenses; see [LICENSES/FONTS.md](LICENSES/FONTS.md).

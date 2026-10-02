@@ -7,7 +7,7 @@ function usage() {
 
 Environment:
   DOCS_PLATFORM_BASE_URL   API base URL, default ${DEFAULT_BASE_URL}
-  DOCS_PLATFORM_API_KEY    User API key from Settings > Password & Email
+  DOCS_PLATFORM_API_KEY    User API key from Settings > AI and CLI
 
 Commands:
   me

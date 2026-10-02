@@ -1,10 +1,10 @@
-# docs-platform MCP 使用说明
+# Workloom MCP 与 CLI 使用说明
 
-docs-platform 提供远程 MCP 入口，让支持 MCP 的 AI 客户端直接管理你的文档和数据表。
+Workloom 提供远程 MCP 入口，让支持 MCP 的 AI 客户端直接管理你的文档和数据表。
 
 ## 入口地址
 
-生产环境 MCP 地址：
+线上实例 MCP 地址（自托管时替换为自己的实例域名，并保留 `/mcp` 路径）：
 
 ```text
 https://company.2dqy.com/mcp
@@ -18,12 +18,14 @@ http://127.0.0.1:4000/mcp
 
 MCP 使用 Streamable HTTP transport，请在客户端里选择远程 HTTP/Streamable HTTP 类型。
 
+本文说明当前公开仓库提供的文档与数据表工具。线上实例的项目记忆及专用记忆 MCP 尚未包含在此仓库中。
+
 ## 获取 API Key
 
-登录 docs-platform 后进入：
+登录 Workloom 后进入：
 
 ```text
-设置 -> 密码与邮箱 -> AI / CLI API Key
+设置 -> AI 与 CLI -> API Key
 ```
 
 在这里可以生成、重建或删除 API Key。
@@ -43,7 +45,7 @@ MCP 请求使用 Bearer token：
 Authorization: Bearer jj_live_xxx
 ```
 
-所有 MCP 操作都会以这个 API Key 对应的用户身份执行，并沿用 docs-platform 现有权限：
+所有 MCP 操作都会以这个 API Key 对应的用户身份执行，并沿用 Workloom 现有权限：
 
 - 私人文档只允许本人和协作者访问。
 - 公共文档按系统公共知识库权限访问。
@@ -56,7 +58,7 @@ Authorization: Bearer jj_live_xxx
 
 ```json
 {
-  "name": "docs-platform",
+  "name": "Workloom",
   "url": "https://company.2dqy.com/mcp",
   "headers": {
     "Authorization": "Bearer jj_live_xxx"
@@ -64,7 +66,7 @@ Authorization: Bearer jj_live_xxx
 }
 ```
 
-如果客户端只支持环境变量，可以这样设置：
+仓库内 CLI 使用以下环境变量；远程 MCP 客户端请按自身配置方式填写 URL 和认证头：
 
 ```bash
 export DOCS_PLATFORM_BASE_URL="https://company.2dqy.com"
@@ -242,7 +244,7 @@ npm run docs-platform -- tables list
 
 如果客户端无法连接：
 
-1. 确认 MCP 地址是 `https://company.2dqy.com/mcp`。
+1. 确认 MCP 地址为你的实例域名加 `/mcp`；线上实例为 `https://company.2dqy.com/mcp`。
 2. 确认请求带了 `Authorization: Bearer jj_live_xxx`。
 3. 确认 API Key 没有被重建或删除。
 4. 先用 `tools/list` 测试是否能列出工具。
