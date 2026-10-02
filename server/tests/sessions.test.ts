@@ -11,6 +11,19 @@ afterEach(async () => {
 });
 
 describe('登录设备管理', () => {
+  it('accepts the previous session cookie and revokes it on logout', async () => {
+    const app = await getApp();
+    const { cookie } = await registerUser('legacy-session@test.local', 'Existing User');
+    const currentCookie = cookie.find((value) => value.startsWith('workloom_session='));
+    expect(currentCookie).toBeTruthy();
+    const legacyCookie = currentCookie!.split(';')[0].replace('workloom_session=', 'jianji_session=');
+    await request(app).get('/api/auth/me').set('Cookie', legacyCookie).expect(200);
+    const logout = await request(app).post('/api/auth/logout').set('Cookie', legacyCookie).expect(200);
+    expect(logout.headers['set-cookie'].join(' ')).toContain('workloom_session=;');
+    expect(logout.headers['set-cookie'].join(' ')).toContain('jianji_session=;');
+    await request(app).get('/api/auth/me').set('Cookie', legacyCookie).expect(401);
+  });
+
   it('登录后会话列表包含当前设备', async () => {
     const app = await getApp();
     const { cookie } = await registerUser('s1@test.local', 'S1');

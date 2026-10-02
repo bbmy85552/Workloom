@@ -11,6 +11,24 @@ afterEach(async () => {
 });
 
 describe('管理后台', () => {
+  it('normalizes historical default brands while preserving custom company names', async () => {
+    const app = await getApp();
+    const { cookie } = await loginAdmin();
+    for (const previousBrand of ['文档中心', '简记', 'Jianji']) {
+      await request(app)
+        .put('/api/admin/settings')
+        .set('Cookie', cookie)
+        .send({ brand_name: previousBrand, company_name: 'My Company' })
+        .expect(200);
+      const publicSettings = await request(app).get('/api/public/settings');
+      expect(publicSettings.body.brandName).toBe('Workloom');
+      expect(publicSettings.body.companyName).toBe('My Company');
+      const adminSettings = await request(app).get('/api/admin/settings').set('Cookie', cookie);
+      expect(adminSettings.body.settings.brand_name).toBe('Workloom');
+      expect(adminSettings.body.settings.company_name).toBe('My Company');
+    }
+  });
+
   it('管理员可以禁用用户，禁用后不可登录', async () => {
     const app = await getApp();
     const { cookie: userCookie } = await registerUser('victim@test.local', 'Victim');
@@ -72,7 +90,7 @@ describe('管理后台', () => {
       .get('/api/notifications')
       .set('Cookie', userCookie);
     expect(notifications.status).toBe(200);
-    expect(notifications.body.list[0].title).toBe('文档中心正在更新');
+    expect(notifications.body.list[0].title).toBe('Workloom 正在更新');
 
     const finished = await request(app)
       .post('/api/admin/update/finish')
@@ -81,6 +99,6 @@ describe('管理后台', () => {
     expect(finished.status).toBe(200);
 
     const after = await request(app).get('/api/notifications').set('Cookie', userCookie);
-    expect(after.body.list[0].title).toBe('文档中心已更新完毕');
+    expect(after.body.list[0].title).toBe('Workloom 已更新完毕');
   });
 });

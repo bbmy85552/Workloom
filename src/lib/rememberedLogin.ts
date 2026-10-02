@@ -1,4 +1,7 @@
-const STORAGE_KEY = 'jianji.rememberedLogin.v1';
+import { clearBrowserValue, readBrowserValue, writeBrowserValue } from './browserStorage';
+
+const STORAGE_KEY = 'workloom.rememberedLogin.v1';
+const LEGACY_STORAGE_KEY = 'jianji.rememberedLogin.v1';
 
 export interface RememberedLogin {
   email: string;
@@ -25,15 +28,15 @@ function decode(value: string): RememberedLogin | null {
 
 export function readRememberedLogin(): RememberedLogin | null {
   if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw = readBrowserValue(STORAGE_KEY, LEGACY_STORAGE_KEY);
   return raw ? decode(raw) : null;
 }
 
 export function saveRememberedLogin(value: RememberedLogin) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ email: value.email }));
+  writeBrowserValue(STORAGE_KEY, JSON.stringify({ email: value.email }), LEGACY_STORAGE_KEY);
 }
 
 export function clearRememberedLogin() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(STORAGE_KEY);
+  clearBrowserValue(STORAGE_KEY, LEGACY_STORAGE_KEY);
 }

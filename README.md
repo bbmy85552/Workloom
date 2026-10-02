@@ -1,80 +1,61 @@
 # Workloom
 
-一个自托管协作工作空间，把知识整理、文档编辑、数据表、日程和邮箱连接起来。
+一个自托管协作工作空间，让知识、文档、数据、日程和团队工作在同一处衔接。
 
-[简体中文](README.md) · [English](README.en.md) · [线上实例](https://company.2dqy.com) · [MCP 与 CLI](MCP_USAGE.md)
+[简体中文](README.md) · [English](README.en.md) · [线上实例](https://company.2dqy.com) · [部署配置](配置说明.md) · [MCP 与 CLI](MCP_USAGE.md)
 
-Workloom 由 [bbmy85552](https://github.com/bbmy85552) 基于开源项目 [简记 Jianji](https://github.com/staklab/jianji) 持续开发，面向个人资料整理与小团队日常协作。开发内容覆盖知识库组织、批量导入、编辑与排版、协作保存、团队接入、品牌配置、OA 和回收站；MCP/CLI 是其中的外部工具接口。
+Workloom 面向个人与小团队：把资料整理为知识库，用文档记录思路，用数据表管理事项，再通过待办、日历、邮箱和 OA 跟进日常工作。内容保存在自己的实例中，团队成员按账号权限访问；外部 AI 和脚本也可以通过 MCP 与 CLI 使用已授权的资料。
 
-## Workloom 的开发与扩展
+## 从资料到日常工作
 
-| 领域 | 新增或改进 |
+| 工作环节 | Workloom 提供的能力 |
 | --- | --- |
-| 知识库组织 | 显式文件夹、路径导航、文件夹网格与拖入整理；自己的私人普通文档可复制到公共知识库，私人文档或目录树可移到公共空间，管理员可把公共内容移回自己的私人空间 |
-| 批量导入与文件处理 | 批量 DOCX、Markdown、TXT 导入，逐个处理并展示进度与失败反馈；改善导入图片的附件保存、引用处理，以及 DOCX 导出的图片与表格兼容性 |
-| 阅读与编辑 | 大屏标题目录和锚点导航、剪贴板图片粘贴、Markdown 粘贴转富文本，以及只读文档和分享页的阅读改进 |
-| 表格与表单 | 文档内表格的一键自动排版、数据表按内容计算列宽与对齐的可选开关，以及公开表单下拉选项兼容修复 |
-| 协作保存 | 保存版本校验、冲突左右对比与版本选择、保存请求排队；减少连续保存的误报冲突，并让分享链接在登录后返回原位置 |
-| 团队接入与品牌 | Google 登录、邀请码注册；品牌与公司名称应用到界面、登录注册页面及系统邮件 |
-| OA 接入 | 可配置的侧栏入口，将独立 OA 系统内嵌到工作空间，也支持新窗口打开 |
-| 公共文档回收站 | 公共文档及子树软删除，管理员可恢复选中文档及必要父链、永久清理；私人文档仍直接删除 |
-| 外部工具 | 用户 API Key、远程 MCP、CLI 和独立设置页，沿用账号权限访问文档与数据表 |
+| 整理知识 | 私人、公共、共享、收藏视图；层级文档、文件夹、路径导航与拖入整理；跨空间复制和移动 |
+| 迁入资料 | 批量导入 DOCX、Markdown、TXT，查看处理进度和失败反馈，处理文档图片与附件引用 |
+| 编辑与阅读 | TipTap 富文本、图片和附件、Markdown 与图片粘贴、文档内表格排版、大屏标题目录、只读阅读与分享页面 |
+| 文档协作 | 分享链接、协作者权限、评论、版本恢复、自动保存、保存队列、冲突左右对比与版本选择 |
+| 管理结构化信息 | 字段、模板、公式，表格/看板/日历/甘特视图，按内容调整列宽，CSV 导入与 CSV/XLSX 导出，公开表单 |
+| 跟进待办与日程 | 工作台概览、待办、近期文档，月/周/日历、重复日程、待办排期，站内与邮件提醒 |
+| 处理邮箱 | IMAP/SMTP 账号绑定、多文件夹同步、站内写信与回复、附件发送、邮件转待办 |
+| 沉淀项目上下文 | 线上版项目记忆按项目记录事实、决策与偏好，提供个人、公共、共享项目入口与专用记忆 MCP |
+| 组织团队入口 | 邮箱与 Google 登录、邀请码注册、品牌与公司名称设置、OA 侧栏与内嵌页面 |
+| 维护内容和实例 | 公共文档回收站、用户与用户组、会话管理、审计、备份恢复、迁移和更新管理 |
+| 连接外部工具 | 用户 API Key、远程 MCP、CLI，以用户身份访问文档、数据表、字段与记录 |
 
-这些扩展建立在上游已有的文档、数据表、日历、邮箱和管理后台等基础模块之上。协作保存通过冲突检测与版本选择处理并发编辑，不提供自动合并；OA 接入是独立系统的嵌入入口。
+## 适合怎样使用
 
-## 工作空间的完整能力
+- **个人知识空间**：把零散的文档和笔记批量导入，用文件夹、收藏、目录和搜索组织长期资料。
+- **团队共享知识库**：从私人草稿整理到公共内容，配置查看和编辑权限，通过评论、版本记录与冲突选择协作维护。
+- **项目与日常办公**：用数据表记录任务和资料，用日历安排时间，从邮箱生成待办，并在同一侧栏进入 OA。
+- **AI 工作上下文**：让支持远程 MCP 的客户端读取和更新获授权的资料，或通过 CLI 把文档和数据表接入脚本工作流。
 
-| 模块 | 能力 |
+## 使用细节
+
+自己的私人普通文档可以复制到公共知识库，私人文档或目录树可以移到公共空间；管理员可以把公共内容移回自己的私人空间。公共文档及其子树删除后进入回收站，管理员可恢复选中文档及必要父链；私人文档直接删除。
+
+并发编辑通过保存版本检查、冲突对比与版本选择处理，不会自动合并两个版本。文档内表格排版由用户触发，数据表按内容计算列宽是可选开关。OA 页面加载配置的独立系统地址。
+
+当前 Workloom 本地演示界面，使用示例数据。
+
+| 知识库与文件夹 | 富文本编辑与标题目录 |
 | --- | --- |
-| 文档中心 | 私人、公共、共享、收藏视图，层级文档与文件夹，TipTap 富文本，附件，导入导出，评论，分享和版本恢复 |
-| 数据表 | 字段与模板，表格、看板、日历、甘特视图，公式字段，CSV 导入，CSV/XLSX 导出，公开表单 |
-| 工作台与日历 | 待办、近期文档、日程概览，月/周/日视图，重复日程、站内与邮件提醒 |
-| 邮箱 | IMAP/SMTP 绑定，多文件夹同步，站内写信与附件发送，邮件转待办 |
-| 团队管理 | 用户、用户组、会话管理、注册策略、Google 登录、品牌、OA、公共文档回收站 |
-| 自托管 | React、Express、TipTap、SQLite，Docker Compose 部署，备份恢复和迁移 |
-
-## 线上实例与仓库版本
-
-[线上实例](https://company.2dqy.com)需要登录，资料访问遵循账号权限。线上还展示了“项目记忆”：按项目沉淀事实、决策与偏好，提供个人、公共和共享项目入口以及专用记忆 MCP。**当前公开仓库尚未包含该模块**；部署此仓库可获得的 MCP 工具以 [MCP_USAGE.md](MCP_USAGE.md) 中的文档与数据表工具为准。
-
-## 基础模块预览
-
-以下四张图片沿用上游截图，用于展示基础模块；Workloom 的扩展功能以上文说明及当前源码为准。
-
-<table>
-  <tr>
-    <td><img src="docs/images/screenshot-dashboard.png" width="420" alt="工作台" /></td>
-    <td><img src="docs/images/screenshot-doc-editor.png" width="420" alt="文档编辑器" /></td>
-  </tr>
-  <tr>
-    <td align="center">工作台</td>
-    <td align="center">文档编辑器</td>
-  </tr>
-  <tr>
-    <td><img src="docs/images/screenshot-mail.png" width="420" alt="邮箱聚合" /></td>
-    <td><img src="docs/images/screenshot-admin-settings.png" width="420" alt="管理后台系统设置" /></td>
-  </tr>
-  <tr>
-    <td align="center">邮箱聚合</td>
-    <td align="center">管理后台</td>
-  </tr>
-</table>
+| ![知识库](docs/images/workloom-knowledge.jpg) | ![文档编辑器](docs/images/workloom-editor.jpg) |
+| 多视图数据表 | AI 与 CLI 设置 |
+| ![数据表](docs/images/workloom-tables.jpg) | ![AI 与 CLI](docs/images/workloom-ai-settings.jpg) |
 
 ## 快速部署
 
-推荐在服务器上使用 Docker Compose，并准备可用的 SMTP 配置以完成首次初始化。安装脚本会生成 `.env`、强随机 `JWT_SECRET`、私密首次配置链接，并启动容器。管理员账号、SMTP、注册策略等内容会在浏览器初始化向导中配置。
+需要 Docker Engine、Docker Compose v2，以及用于首次初始化的可用 SMTP 配置。安装器生成 `.env`、随机密钥和私密配置链接，并启动服务。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bbmy85552/Workloom/main/scripts/install.sh | bash -s -- \
   --repo https://github.com/bbmy85552/Workloom.git \
-  --dir Workloom \
+  --dir workloom \
   --app-url https://workloom.example.com \
   --yes
 ```
 
-命令中的 `--repo` 明确指定 Workloom；安装脚本的兼容默认值仍指向上游，请保留此参数。
-
-也可以先克隆仓库：
+也可以从源码目录安装：
 
 ```bash
 git clone https://github.com/bbmy85552/Workloom.git
@@ -82,67 +63,67 @@ cd Workloom
 bash scripts/install.sh
 ```
 
-安装完成后查看状态和首次配置链接：
+在安装目录检查服务，并查看首次配置链接：
 
 ```bash
 docker compose ps
-docker compose logs -f jianji
-cat ./SETUP_URL.txt
+docker compose logs -f workloom
+cat SETUP_URL.txt
 ```
 
-更多环境变量、SMTP、Nginx、证书和迁移说明见 [配置说明.md](配置说明.md)。
+打开私密配置链接，创建管理员并配置 SMTP 和注册策略。随后可在管理后台配置邀请码、品牌、公司名和 OA 地址。Google 登录通过 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 配置；开启注册仍需要有效邀请码。
 
-## 更新模型
+**部署备注：** 线上实例需要登录；线上已展示的项目记忆及专用记忆 MCP 尚未同步到当前公开源码，克隆部署范围以本仓库实现为准。
 
-Workloom 使用 GitHub 分支提交检查更新。通过上述克隆/安装命令部署后，安装脚本会根据当前 `origin` 和分支写入更新源及当前 commit。手动部署时，请在 `.env` 中明确配置 Workloom 的更新源，避免使用兼容配置中保留的上游默认值：
+完整环境变量、反向代理、数据卷和迁移说明见 [配置说明.md](配置说明.md)。
+
+## AI 与命令行接入
+
+在 **设置 → AI 与 CLI** 中生成 API Key。远程 MCP 使用 Streamable HTTP，地址为 `https://你的域名/mcp`，以 `Authorization: Bearer <API Key>` 认证。请使用自己实例的地址和密钥。
+
+```bash
+export WORKLOOM_BASE_URL="https://workloom.example.com"
+export WORKLOOM_API_KEY="<你的 API Key>"
+npm run workloom -- docs list
+npm run workloom -- tables list
+```
+
+工具、参数和客户端配置见 [MCP_USAGE.md](MCP_USAGE.md)。
+
+## 更新与数据
+
+安装器会把当前仓库、分支和提交写入部署配置。手动部署时设置：
 
 ```env
-JIANJI_UPDATE_REPO=https://github.com/bbmy85552/Workloom.git
-JIANJI_UPDATE_BRANCH=main
-JIANJI_UPDATE_CHECK_URL=https://api.github.com/repos/bbmy85552/Workloom/commits/main
+WORKLOOM_UPDATE_REPO=https://github.com/bbmy85552/Workloom.git
+WORKLOOM_UPDATE_BRANCH=main
+WORKLOOM_UPDATE_CHECK_URL=https://api.github.com/repos/bbmy85552/Workloom/commits/main
 ```
 
-服务器无损更新：
+在部署目录执行更新：
 
 ```bash
 bash scripts/update.sh
 ```
 
-低内存服务器可使用宿主机构建、运行时镜像方式：
+低内存服务器可采用宿主机构建的运行时镜像方案：
 
 ```bash
 bash scripts/update-runtime.sh
 ```
 
-更新脚本会备份 `.env` 和 `SETUP_URL.txt`，保留 SQLite 与上传文件 Docker 卷，拉取最新代码，重建容器，并等待服务健康检查通过。若部署目录不是 Git checkout，脚本会从 `JIANJI_UPDATE_REPO` / `JIANJI_UPDATE_BRANCH` 指向的 GitHub 分支归档刷新源码，同时继续保护运行时配置与数据。单容器部署会有极短重启窗口；如果需要严格零中断，可以在 Nginx 前做蓝绿发布。
-
-如果你的部署环境无法稳定访问 GitHub 的仓库接口或源码归档地址，服务器端自动拉取更新将不可用。可以在一台能获取最新源码的本地电脑上执行推送式更新：
+如果服务器无法获取 GitHub 源码，可在已获取最新代码的电脑上推送更新，`--dir` 填实际部署目录：
 
 ```bash
 git pull
-bash scripts/push-update.sh --host root@example.com --dir /opt/jianji --runtime
+bash scripts/push-update.sh --host root@example.com --dir /opt/workloom --runtime
 ```
 
-推送式更新会通过 SSH/rsync 同步源码，并让服务器跳过远端拉取步骤，直接执行无损重建；服务器上的 `.env`、初始化链接、证书、数据库、上传文件和备份目录不会被覆盖。
-
-## AI 与命令行接入
-
-在“设置 → AI 与 CLI”中生成用户 API Key。远程 MCP 使用 Streamable HTTP，端点是 `https://你的域名/mcp`，通过 `Authorization: Bearer <API Key>` 认证。当前设置页的示例地址指向线上实例；自托管时请换成自己的实例域名。
-
-CLI 使用现有命令与环境变量名：
-
-```bash
-export DOCS_PLATFORM_BASE_URL="https://workloom.example.com"
-export DOCS_PLATFORM_API_KEY="<你的 API Key>"
-npm run docs-platform -- docs list
-npm run docs-platform -- tables list
-```
-
-详细工具、参数和客户端配置见 [MCP_USAGE.md](MCP_USAGE.md)。Google 登录通过 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 配置；邀请码、品牌和 OA 地址在管理后台设置。新用户注册需要有效邀请码；允许注册的开关不会免除邀请码校验。
+SQLite 数据库和上传文件分别保存在 `workloom-data`、`workloom-uploads` 持久卷中。更新保留数据与运行配置；单容器重建会有重启窗口。已有实例首次切换部署名称时，应先取得新版脚本，再按 [迁移说明](配置说明.md#已有实例迁移) 核对数据卷并运行更新；旧脚本不会自动获得新版迁移保护。不要更换密钥或删除原卷。
 
 ## 本地开发
 
-首次克隆后先创建 `server/.env`，按需编辑配置再安装依赖；如果已有配置，请保留原文件。
+首次克隆后创建 `server/.env`，编辑本地配置；已有文件会保留。
 
 ```bash
 cp -n server/.env.example server/.env
@@ -150,14 +131,7 @@ npm run setup
 npm run dev
 ```
 
-默认开发地址：
-
-| 服务 | 地址 |
-| --- | --- |
-| Web | `http://localhost:3000` |
-| API | `http://localhost:4000` |
-
-## 测试与构建
+Web 默认位于 `http://localhost:3000`，API 位于 `http://localhost:4000`。生产 Docker 使用项目根目录 `.env`。
 
 ```bash
 npm run lint
@@ -165,19 +139,8 @@ npm run test
 npm run build
 ```
 
-## 数据与安全
+技术栈为 React、TypeScript、Vite、TipTap、Express、Prisma 和 SQLite。产品说明见 [docs/PRD.md](docs/PRD.md)，维护说明见 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)。
 
-为兼容现有部署，服务名 `jianji`、`jianji:*` 镜像名、`JIANJI_*` 配置名及下列数据卷名保持不变。已有实例继续使用原部署目录和 Compose 项目名，避免连接到新的空卷。
+## 来源与许可
 
-Docker 部署使用两个持久化卷：
-
-| 卷 | 内容 |
-| --- | --- |
-| `jianji-data` | SQLite 数据库，挂载到 `/app/data` |
-| `jianji-uploads` | 头像、附件等上传文件，挂载到 `/app/uploads` |
-
-仓库和 Docker 构建上下文默认排除 `.env`、`SETUP_URL.txt`、SQLite 数据库、上传目录、证书、密钥和本地缓存。迁移包可能包含加密后的邮箱凭据和用户上传文件，请按私密备份保存。
-
-## License
-
-Workloom 在 [staklab/jianji](https://github.com/staklab/jianji) 的基础上开发，保留原作者署名，应用代码继续采用 [MIT License](LICENSE)。内置字体遵循各自 OFL 许可，见 [LICENSES/FONTS.md](LICENSES/FONTS.md)。
+Workloom 由 [bbmy85552](https://github.com/bbmy85552) 基于 [Jianji](https://github.com/staklab/jianji) 大幅改进并持续开发。保留原作者版权声明，应用代码采用 [MIT License](LICENSE)；字体许可见 [LICENSES/FONTS.md](LICENSES/FONTS.md)。

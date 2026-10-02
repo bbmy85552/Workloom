@@ -1,3 +1,4 @@
+import { FOLDER_CONTENT, isFolderContent } from '../lib/folder.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
@@ -5,7 +6,6 @@ import type { AuthedUser } from '../middleware/auth.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
 import { HttpError } from '../lib/asyncHandler.js';
 
-const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
 const FIELD_TYPES = [
   'text',
   'longtext',
@@ -36,10 +36,6 @@ function jsonContent(data: unknown) {
       },
     ],
   };
-}
-
-function isFolderContent(contentJson: string | null | undefined) {
-  return (contentJson ?? '').includes('data-jianji-type="folder"');
 }
 
 function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
@@ -80,17 +76,17 @@ function assertWrite(ctx: { canWrite: boolean }) {
   if (!ctx.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
 }
 
-export function createDocsPlatformMcpServer(user: AuthedUser) {
+export function createWorkloomMcpServer(user: AuthedUser) {
   const server = new McpServer({
-    name: 'docs-platform',
+    name: 'workloom',
     version: '0.1.0',
   });
 
   server.registerTool(
-    'docs_platform_me',
+    'workloom_me',
     {
       title: 'Current User',
-      description: 'Return the authenticated docs-platform user for this API key.',
+      description: 'Return the authenticated Workloom user for this API key.',
     },
     async () => jsonContent({ user }),
   );
@@ -99,7 +95,7 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     'docs_list',
     {
       title: 'List Documents',
-      description: 'List accessible documents in docs-platform.',
+      description: 'List accessible documents in Workloom.',
       inputSchema: {
         scope: z.enum(['mine', 'public', 'shared', 'all']).default('all'),
         q: z.string().max(120).optional(),

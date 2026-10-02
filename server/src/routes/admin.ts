@@ -7,7 +7,7 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { hashPassword, generateNumericCode } from '../lib/hash.js';
 import { sendMail } from '../lib/mail.js';
-import { getMailBrandName } from '../lib/systemSettings.js';
+import { getMailBrandName, normalizeBrandName } from '../lib/systemSettings.js';
 import { createBackupPayload, createMigrationPayload, restoreBackupPayload, restoreMigrationPayload } from '../lib/backup.js';
 import { contentDispositionAttachment } from '../lib/filename.js';
 import { env } from '../env.js';
@@ -293,8 +293,8 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   allow_public_register: 'true',
   default_workspace_name: '我的空间',
   max_upload_mb: '25',
-  brand_name: '文档中心',
-  company_name: '文档中心',
+  brand_name: 'Workloom',
+  company_name: 'Workloom',
   oa_url: 'https://2dqy-oa.2dqy.com/calendar',
   register_invite_code: '',
   latest_version: '',
@@ -349,13 +349,13 @@ function commitFromPayload(payload: unknown) {
 }
 
 async function fetchLatestUpdateInfo() {
-  if (!env.JIANJI_UPDATE_CHECK_URL || env.NODE_ENV === 'test') {
+  if (!env.WORKLOOM_UPDATE_CHECK_URL || env.NODE_ENV === 'test') {
     return { version: '', commit: '', source: 'disabled' };
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(env.JIANJI_UPDATE_CHECK_URL, {
+    const response = await fetch(env.WORKLOOM_UPDATE_CHECK_URL, {
       signal: controller.signal,
       headers: { Accept: 'application/json, text/plain' },
     });
@@ -366,16 +366,16 @@ async function fetchLatestUpdateInfo() {
       return {
         version: versionFromPayload(payload),
         commit: commitFromPayload(payload),
-        source: env.JIANJI_UPDATE_CHECK_URL,
+        source: env.WORKLOOM_UPDATE_CHECK_URL,
       };
     }
     return {
       version: versionFromPayload(await response.text()),
       commit: '',
-      source: env.JIANJI_UPDATE_CHECK_URL,
+      source: env.WORKLOOM_UPDATE_CHECK_URL,
     };
   } catch (err) {
-    console.warn('[简记] 版本检测失败：', (err as Error).message);
+    console.warn('[Workloom] 版本检测失败：', (err as Error).message);
     return { version: '', commit: '', source: 'failed' };
   } finally {
     clearTimeout(timer);
@@ -415,7 +415,7 @@ async function broadcastMaintenanceNotification(input: {
       emails += 1;
     } catch (err) {
       emailErrors += 1;
-      console.warn('[简记] 维护通知邮件发送失败：', u.email, (err as Error).message);
+      console.warn('[Workloom] 维护通知邮件发送失败：', u.email, (err as Error).message);
     }
   }
   return { users: users.length, emails, emailErrors };
@@ -427,6 +427,8 @@ adminRouter.get(
     const rows = await prisma.systemSetting.findMany();
     const map: Record<string, string> = { ...DEFAULT_SETTINGS };
     for (const r of rows) map[r.key] = r.value;
+    map.brand_name = normalizeBrandName(map.brand_name);
+    map.company_name = normalizeBrandName(map.company_name);
     res.json({ settings: map });
   }),
 );
@@ -491,7 +493,7 @@ adminRouter.get(
     const payload = await createBackupPayload();
     const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', contentDispositionAttachment(`jianji-backup-${stamp}.json`));
+    res.setHeader('Content-Disposition', contentDispositionAttachment(`workloom-backup-${stamp}.json`));
     res.json(payload);
   }),
 );
@@ -502,7 +504,7 @@ adminRouter.get(
     const payload = await createMigrationPayload();
     const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', contentDispositionAttachment(`jianji-migration-${stamp}.json`));
+    res.setHeader('Content-Disposition', contentDispositionAttachment(`workloom-migration-${stamp}.json`));
     res.json(payload);
   }),
 );
@@ -514,7 +516,7 @@ adminRouter.post(
       .object({
         confirm: z.literal('RESTORE'),
         backup: z.object({
-          app: z.literal('jianji').optional(),
+          app: z.enum(['workloom', 'jianji']).optional(),
           version: z.number().optional(),
           data: z.record(z.unknown()),
         }),
@@ -532,7 +534,7 @@ adminRouter.post(
       .object({
         confirm: z.literal('RESTORE'),
         backup: z.object({
-          app: z.literal('jianji').optional(),
+          app: z.enum(['workloom', 'jianji']).optional(),
           version: z.number().optional(),
           data: z.record(z.unknown()),
           files: z.array(z.unknown()).optional(),
@@ -550,8 +552,8 @@ adminRouter.get(
     const latestRow = await prisma.systemSetting.findUnique({ where: { key: 'latest_version' } });
     const current = currentVersion();
     const latestInfo = await fetchLatestUpdateInfo();
-    const latest = (latestRow?.value || env.JIANJI_LATEST_VERSION || latestInfo.version || current).trim();
-    const currentCommit = env.JIANJI_CURRENT_COMMIT.trim();
+    const latest = (latestRow?.value || env.WORKLOOM_LATEST_VERSION || latestInfo.version || current).trim();
+    const currentCommit = env.WORKLOOM_CURRENT_COMMIT.trim();
     const latestCommit = latestInfo.commit.trim();
     const commitUpdate = Boolean(currentCommit && latestCommit && currentCommit !== latestCommit);
     const versionUpdate = isNewerVersion(latest, current);
@@ -561,12 +563,12 @@ adminRouter.get(
       currentCommit,
       latestCommit,
       updateSource: latestInfo.source,
-      updateRepo: env.JIANJI_UPDATE_REPO,
-      updateBranch: env.JIANJI_UPDATE_BRANCH,
+      updateRepo: env.WORKLOOM_UPDATE_REPO,
+      updateBranch: env.WORKLOOM_UPDATE_BRANCH,
       hasUpdate: commitUpdate || versionUpdate,
-      autoUpdateConfigured: Boolean(env.JIANJI_UPDATE_COMMAND),
+      autoUpdateConfigured: Boolean(env.WORKLOOM_UPDATE_COMMAND),
       manualCommand: 'bash scripts/update.sh',
-      checkUrl: env.NODE_ENV === 'test' ? '' : env.JIANJI_UPDATE_CHECK_URL,
+      checkUrl: env.NODE_ENV === 'test' ? '' : env.WORKLOOM_UPDATE_CHECK_URL,
     });
   }),
 );
@@ -575,21 +577,21 @@ adminRouter.post(
   '/update/start',
   asyncHandler(async (req, res) => {
     const body = z.object({ latestVersion: z.string().trim().max(40).optional() }).parse(req.body ?? {});
-    const latest = body.latestVersion || env.JIANJI_LATEST_VERSION || currentVersion();
+    const latest = body.latestVersion || env.WORKLOOM_LATEST_VERSION || currentVersion();
     const started = await broadcastMaintenanceNotification({
       actorId: req.user!.id,
-      title: '文档中心正在更新',
-      body: '文档中心正在更新，请在此期间暂时不要使用。更新完成后我们会再次通知你，感谢你的理解与支持。',
+      title: 'Workloom 正在更新',
+      body: 'Workloom 正在更新，请在此期间暂时不要使用。更新完成后我们会再次通知你，感谢你的理解与支持。',
     });
     await prisma.auditLog.create({
       data: {
         actorId: req.user!.id,
         action: 'START_UPDATE',
         target: latest,
-        metaJson: JSON.stringify({ autoUpdateConfigured: Boolean(env.JIANJI_UPDATE_COMMAND), started }),
+        metaJson: JSON.stringify({ autoUpdateConfigured: Boolean(env.WORKLOOM_UPDATE_COMMAND), started }),
       },
     });
-    if (!env.JIANJI_UPDATE_COMMAND) {
+    if (!env.WORKLOOM_UPDATE_COMMAND) {
       res.json({
         ok: true,
         mode: 'manual',
@@ -599,14 +601,14 @@ adminRouter.post(
       return;
     }
     try {
-      const result = await execAsync(env.JIANJI_UPDATE_COMMAND, {
+      const result = await execAsync(env.WORKLOOM_UPDATE_COMMAND, {
         timeout: 30 * 60 * 1000,
         maxBuffer: 2 * 1024 * 1024,
       });
       const finished = await broadcastMaintenanceNotification({
         actorId: req.user!.id,
-        title: '文档中心已更新完毕',
-        body: '感谢您的支持与理解，文档中心已更新完毕，可以继续使用。',
+        title: 'Workloom 已更新完毕',
+        body: '感谢您的支持与理解，Workloom 已更新完毕，可以继续使用。',
       });
       await prisma.auditLog.create({
         data: {
@@ -624,8 +626,8 @@ adminRouter.post(
     } catch (err) {
       await broadcastMaintenanceNotification({
         actorId: req.user!.id,
-        title: '文档中心更新未完成',
-        body: '文档中心更新过程中遇到问题，管理员正在处理。请暂时不要进行关键编辑操作。',
+        title: 'Workloom 更新未完成',
+        body: 'Workloom 更新过程中遇到问题，管理员正在处理。请暂时不要进行关键编辑操作。',
       });
       throw new HttpError(502, `更新命令执行失败：${(err as Error).message}`, 'UPDATE_FAILED');
     }
@@ -637,8 +639,8 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     const finished = await broadcastMaintenanceNotification({
       actorId: req.user!.id,
-      title: '文档中心已更新完毕',
-      body: '感谢您的支持与理解，文档中心已更新完毕，可以继续使用。',
+      title: 'Workloom 已更新完毕',
+      body: '感谢您的支持与理解，Workloom 已更新完毕，可以继续使用。',
     });
     await prisma.auditLog.create({
       data: {

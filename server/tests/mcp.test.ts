@@ -48,8 +48,19 @@ describe('remote MCP endpoint', () => {
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
     expect(tools.status).toBe(200);
     const names = tools.body.result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toContain('workloom_me');
+    expect(names).not.toContain('docs_platform_me');
     expect(names).toContain('docs_create');
     expect(names).toContain('tables_create');
+
+    for (const name of ['workloom_me', 'docs_platform_me']) {
+      const me = await request(app)
+        .post('/mcp')
+        .set(mcpHeaders(apiKey))
+        .send({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name, arguments: {} } });
+      expect(me.status).toBe(200);
+      expect(JSON.parse(me.body.result.content[0].text).user.email).toBe('mcp@test.local');
+    }
 
     const doc = await request(app)
       .post('/mcp')
@@ -95,7 +106,7 @@ describe('remote MCP endpoint', () => {
     const address = listener.address();
     if (!address || typeof address === 'string') throw new Error('failed to bind test server');
 
-    const client = new Client({ name: 'docs-platform-test-client', version: '0.1.0' });
+    const client = new Client({ name: 'workloom-test-client', version: '0.1.0' });
     const transport = new StreamableHTTPClientTransport(
       new URL(`http://127.0.0.1:${address.port}/mcp`),
       {
@@ -106,6 +117,7 @@ describe('remote MCP endpoint', () => {
     );
     try {
       await client.connect(transport);
+      expect(client.getServerVersion()?.name).toBe('workloom');
       const tools = await client.listTools();
       expect(tools.tools.some((tool) => tool.name === 'docs_create')).toBe(true);
 

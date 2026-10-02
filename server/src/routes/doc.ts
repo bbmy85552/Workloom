@@ -1,3 +1,4 @@
+import { FOLDER_CONTENT, isFolderContent } from '../lib/folder.js';
 import { Router } from 'express';
 import fs from 'node:fs';
 import { z } from 'zod';
@@ -20,11 +21,6 @@ export const docRouter = Router();
 docRouter.use(requireAuth, requireEmailVerified);
 
 const ATTACHMENT_RAW_RE = /\/api\/attachments\/([^/?#]+)\/raw/g;
-const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
-
-function isFolderContent(contentJson: string | null | undefined) {
-  return (contentJson ?? '').includes('data-jianji-type="folder"');
-}
 
 function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
   return { ...doc, isFolder: isFolderContent(doc.contentJson) };

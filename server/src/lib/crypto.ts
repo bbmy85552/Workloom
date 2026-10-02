@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { env } from '../env.js';
 
+// Keep the original derivation salt so existing encrypted mail credentials remain readable.
 const key = crypto.scryptSync(env.JWT_SECRET, 'jianji-mail-key', 32);
 
 export function encryptSecret(plain: string): string {

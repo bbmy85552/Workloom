@@ -111,7 +111,7 @@ const KEY_BY_DELEGATE = new Map<string, string>(MODEL_KEYS.map(([key, delegate])
 export interface BackupPayload {
   version: 1;
   exportedAt: string;
-  app: 'jianji';
+  app: 'workloom';
   data: Record<string, unknown[]>;
   counts: Record<string, number>;
 }
@@ -146,7 +146,7 @@ export async function createBackupPayload(): Promise<BackupPayload> {
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    app: 'jianji',
+    app: 'workloom',
     data,
     counts,
   };

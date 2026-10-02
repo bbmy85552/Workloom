@@ -1,5 +1,5 @@
 {
-  "name": "jianji",
+  "name": "workloom",
   "private": true,
   "version": "0.1.0",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "test": "npm --prefix server run test",
     "setup": "npm install && npm --prefix server install && npm --prefix server run prisma:generate && npm --prefix server run prisma:migrate",
     "deploy": "bash scripts/install.sh",
-    "docs-platform": "node scripts/docs-platform-cli.mjs"
+    "docs-platform": "node scripts/docs-platform-cli.mjs",
+    "workloom": "node scripts/workloom-cli.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

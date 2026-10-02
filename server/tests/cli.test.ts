@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { getApp, registerUser, resetData } from './helpers.js';
 import { prisma } from '../src/prisma.js';
+import { hashApiKey, apiKeyPrefix } from '../src/lib/apiKey.js';
 
 beforeAll(async () => {
   await getApp();
@@ -12,13 +13,28 @@ afterEach(async () => {
 });
 
 describe('CLI API', () => {
+  it('accepts existing keys through both current and legacy API headers', async () => {
+    const app = await getApp();
+    const { res } = await registerUser('legacy-cli@test.local', 'Existing User');
+    const key = 'jj_live_existing-key-before-the-rename';
+    await prisma.apiKey.create({
+      data: { userId: res.body.user.id, keyHash: hashApiKey(key), keyPrefix: apiKeyPrefix(key) },
+    });
+    for (const header of ['x-workloom-api-key', 'x-jianji-api-key']) {
+      const me = await request(app).get('/api/cli/me').set(header, key);
+      expect(me.status).toBe(200);
+      expect(me.body.user.email).toBe('legacy-cli@test.local');
+    }
+    await request(app).get('/api/cli/me').set('Authorization', `Bearer ${key}`).expect(200);
+  });
+
   it('can regenerate a user API key and manage docs/tables through CLI routes', async () => {
     const app = await getApp();
     const { cookie } = await registerUser('cli@test.local', 'CLI User');
 
     const keyRes = await request(app).post('/api/me/cli-key/regenerate').set('Cookie', cookie);
     expect(keyRes.status).toBe(200);
-    expect(keyRes.body.apiKey.key).toMatch(/^jj_live_/);
+    expect(keyRes.body.apiKey.key).toMatch(/^wl_live_/);
     const auth = { Authorization: `Bearer ${keyRes.body.apiKey.key}` };
 
     const me = await request(app).get('/api/cli/me').set(auth);
@@ -70,7 +86,7 @@ describe('CLI API', () => {
 
   it('invalid API key cannot access CLI routes', async () => {
     const app = await getApp();
-    const res = await request(app).get('/api/cli/me').set({ Authorization: 'Bearer jj_live_wrong' });
+    const res = await request(app).get('/api/cli/me').set({ Authorization: 'Bearer wl_live_wrong' });
     expect(res.status).toBe(401);
     expect(res.body.code).toBe('API_KEY_INVALID');
   });

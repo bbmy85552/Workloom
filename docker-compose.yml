@@ -1,13 +1,13 @@
 services:
-  jianji:
+  workloom:
     build:
       context: .
       dockerfile: Dockerfile
-    image: jianji:latest
-    container_name: jianji
+    image: workloom:latest
+    container_name: workloom
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "${WORKLOOM_PORT:-4000}:4000"
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -15,7 +15,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-file:/app/data/dev.db}
       JWT_SECRET: ${JWT_SECRET:?please set JWT_SECRET to a long random value}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      COOKIE_NAME: ${COOKIE_NAME:-jianji_session}
+      COOKIE_NAME: ${COOKIE_NAME:-workloom_session}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SETUP_TOKEN: ${SETUP_TOKEN:?please set SETUP_TOKEN}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
@@ -27,20 +27,24 @@ services:
       MAIL_SECURE: ${MAIL_SECURE:-true}
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASS: ${MAIL_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-文档中心 <no-reply@example.com>}
+      MAIL_FROM: ${MAIL_FROM:-Workloom <no-reply@example.com>}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
       ALLOW_PUBLIC_REGISTER: ${ALLOW_PUBLIC_REGISTER:-true}
       APP_VERSION: ${APP_VERSION:-0.1.0}
-      JIANJI_LATEST_VERSION: ${JIANJI_LATEST_VERSION:-}
-      JIANJI_CURRENT_COMMIT: ${JIANJI_CURRENT_COMMIT:-}
-      JIANJI_UPDATE_REPO: ${JIANJI_UPDATE_REPO:-https://github.com/staklab/jianji.git}
-      JIANJI_UPDATE_BRANCH: ${JIANJI_UPDATE_BRANCH:-main}
-      JIANJI_UPDATE_CHECK_URL: ${JIANJI_UPDATE_CHECK_URL:-https://api.github.com/repos/staklab/jianji/commits/main}
-      JIANJI_UPDATE_COMMAND: ${JIANJI_UPDATE_COMMAND:-}
+      WORKLOOM_LATEST_VERSION: ${WORKLOOM_LATEST_VERSION:-}
+      WORKLOOM_CURRENT_COMMIT: ${WORKLOOM_CURRENT_COMMIT:-}
+      WORKLOOM_UPDATE_REPO: ${WORKLOOM_UPDATE_REPO:-https://github.com/bbmy85552/Workloom.git}
+      WORKLOOM_UPDATE_BRANCH: ${WORKLOOM_UPDATE_BRANCH:-main}
+      WORKLOOM_UPDATE_CHECK_URL: ${WORKLOOM_UPDATE_CHECK_URL:-https://api.github.com/repos/bbmy85552/Workloom/commits/main}
+      WORKLOOM_UPDATE_COMMAND: ${WORKLOOM_UPDATE_COMMAND:-}
     volumes:
-      - jianji-data:/app/data
-      - jianji-uploads:/app/uploads
+      - workloom-data:/app/data
+      - workloom-uploads:/app/uploads
 
 volumes:
-  jianji-data:
-  jianji-uploads:
+  workloom-data:
+    external: ${WORKLOOM_VOLUMES_EXTERNAL:-false}
+    name: ${WORKLOOM_DATA_VOLUME:?run scripts/install.sh or scripts/update.sh to verify the data volume}
+  workloom-uploads:
+    external: ${WORKLOOM_VOLUMES_EXTERNAL:-false}
+    name: ${WORKLOOM_UPLOADS_VOLUME:?run scripts/install.sh or scripts/update.sh to verify the uploads volume}

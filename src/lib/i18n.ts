@@ -1,11 +1,12 @@
 import type { UserPreferences } from './types';
+import { readBrowserValue, writeBrowserValue } from './browserStorage';
 
 export type LanguagePreference = UserPreferences['language'];
 
-const LANGUAGE_KEY = 'jianji.language';
+const LANGUAGE_KEY = 'workloom.language';
+const LEGACY_LANGUAGE_KEY = 'jianji.language';
 
 const exactEn: Record<string, string> = {
-  简记: 'Document Center',
   文档中心: 'Workspace',
   工作台: 'Dashboard',
   知识库: 'Docs',
@@ -111,8 +112,8 @@ const exactEn: Record<string, string> = {
   '新的 API Key 已生成，请立即保存': 'New API Key generated. Save it now.',
   'API Key 已删除': 'API Key deleted',
   '远程 MCP': 'Remote MCP',
-  '支持远程 MCP 的客户端可以直接连接 docs-platform，不需要下载源码。':
-    'Clients that support remote MCP can connect directly to docs-platform without downloading the source code.',
+  '支持远程 MCP 的客户端可以直接连接 Workloom，不需要下载源码。':
+    'Clients that support remote MCP can connect directly to Workloom without downloading the source code.',
   'MCP 地址': 'MCP URL',
   客户端配置示例: 'Client Configuration Example',
   '测试 tools/list': 'Test tools/list',
@@ -313,7 +314,7 @@ const exactEn: Record<string, string> = {
   今天是: 'Today is',
   '今天是 ': 'Today is ',
   '，把重要的事情先完成吧。': ". Let's finish the important things first.",
-  简记用户: 'Document Center User',
+  Workloom用户: 'Workloom User',
   '今日还没有待办，添加一项开始吧': 'No todos today. Add one to get started.',
   今日进度: "Today's Progress",
   添加待办: 'Add Todo',
@@ -531,15 +532,15 @@ const exactEn: Record<string, string> = {
   显示名称: 'Display Name',
   管理员邮箱: 'Admin Email',
   管理员密码: 'Admin Password',
-  首次配置简记: 'First-time Document Center Setup',
+  '首次配置Workloom': 'Set up Workloom',
   需要初始化密钥: 'Setup Token Required',
   正在检查初始化状态: 'Checking setup status',
   '正在检查初始化状态…': 'Checking setup status...',
   完成配置: 'Complete Setup',
   页面走丢了: 'Page not found.',
   '页面走丢了。': 'Page not found.',
-  '登录简记，开始你的工作': 'Log in to the document center and start your work',
-  '登录简记，开始你的工作。': 'Log in to the document center and start your work.',
+  '登录Workloom，开始你的工作': 'Log in to Workloom and start your work',
+  '登录Workloom，开始你的工作。': 'Log in to Workloom and start your work.',
   还没有账号: 'No account yet',
   '还没有账号？': 'No account yet?',
   忘记密码: 'Forgot password',
@@ -623,7 +624,7 @@ const exactEn: Record<string, string> = {
   加入协作: 'Join Collaboration',
   已加入协作: 'Joined collaboration',
   无法打开分享内容: 'Cannot open shared content',
-  '简记 · 公开表单': 'Document Center · Public Form',
+  'Workloom · 公开表单': 'Workloom · Public Form',
   由表单创建者邀请你填写: 'Invited by the form creator',
   '提交成功，感谢你的反馈': 'Submitted successfully. Thank you for your feedback',
   '提交成功，感谢你的反馈！': 'Submitted successfully. Thank you for your feedback!',
@@ -895,7 +896,7 @@ function scheduleApply(root: Node = document.body) {
 
 export function installI18nDomTranslator() {
   if (typeof window === 'undefined' || observer) return;
-  const stored = window.localStorage.getItem(LANGUAGE_KEY) as LanguagePreference | null;
+  const stored = readBrowserValue(LANGUAGE_KEY, LEGACY_LANGUAGE_KEY) as LanguagePreference | null;
   if (stored === 'en' || stored === 'zh-CN') {
     document.documentElement.dataset.language = stored;
     document.documentElement.lang = stored;
@@ -931,10 +932,6 @@ export function applyLanguage(language?: LanguagePreference | null) {
   const next: LanguagePreference = language === 'en' ? 'en' : 'zh-CN';
   document.documentElement.dataset.language = next;
   document.documentElement.lang = next;
-  try {
-    window.localStorage.setItem(LANGUAGE_KEY, next);
-  } catch {
-    /* ignore */
-  }
+  writeBrowserValue(LANGUAGE_KEY, next, LEGACY_LANGUAGE_KEY);
   scheduleApply(document.documentElement);
 }

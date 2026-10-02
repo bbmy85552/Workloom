@@ -8,17 +8,21 @@ export interface PublicSettings {
 }
 
 export const DEFAULT_PUBLIC_SETTINGS: PublicSettings = {
-  brandName: '文档中心',
-  companyName: '文档中心',
+  brandName: 'Workloom',
+  companyName: 'Workloom',
   oaUrl: 'https://2dqy-oa.2dqy.com/calendar',
   googleClientId: '',
 };
 
+function currentBrand(value: string | undefined) {
+  return !value || ['文档中心', '简记', 'jianji'].includes(value.trim().toLowerCase()) ? 'Workloom' : value;
+}
+
 export async function fetchPublicSettings() {
   const { data } = await api.get<Partial<PublicSettings>>('/public/settings');
   return {
-    brandName: data.brandName || DEFAULT_PUBLIC_SETTINGS.brandName,
-    companyName: data.companyName || DEFAULT_PUBLIC_SETTINGS.companyName,
+    brandName: currentBrand(data.brandName),
+    companyName: currentBrand(data.companyName),
     oaUrl: data.oaUrl || DEFAULT_PUBLIC_SETTINGS.oaUrl,
     googleClientId: data.googleClientId || DEFAULT_PUBLIC_SETTINGS.googleClientId,
   };

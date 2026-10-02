@@ -1,5 +1,11 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { env } from '../env.js';
+
+const LEGACY_AUTH_COOKIE = 'jianji_session';
+
+export function readAuthCookie(req: Request): string | undefined {
+  return req.cookies?.[env.COOKIE_NAME] || req.cookies?.[LEGACY_AUTH_COOKIE];
+}
 
 export function setAuthCookie(res: Response, token: string) {
   res.cookie(env.COOKIE_NAME, token, {
@@ -13,4 +19,7 @@ export function setAuthCookie(res: Response, token: string) {
 
 export function clearAuthCookie(res: Response) {
   res.clearCookie(env.COOKIE_NAME, { path: '/' });
+  if (env.COOKIE_NAME !== LEGACY_AUTH_COOKIE) {
+    res.clearCookie(LEGACY_AUTH_COOKIE, { path: '/' });
+  }
 }

@@ -4,8 +4,10 @@ import { hashApiKey } from '../lib/apiKey.js';
 import { prisma } from '../prisma.js';
 
 function extractApiKey(req: Request) {
-  const header = req.headers['x-jianji-api-key'];
-  if (typeof header === 'string' && header.trim()) return header.trim();
+  for (const name of ['x-workloom-api-key', 'x-jianji-api-key']) {
+    const header = req.headers[name];
+    if (typeof header === 'string' && header.trim()) return header.trim();
+  }
   const auth = req.headers.authorization;
   if (auth?.startsWith('Bearer ')) return auth.slice(7).trim();
   return undefined;

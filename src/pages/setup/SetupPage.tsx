@@ -79,7 +79,7 @@ export function SetupPage() {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === 'mailUser' && !mailFromTouched) {
-        next.mailFrom = value ? `文档中心 <${value}>` : '';
+        next.mailFrom = value ? `Workloom <${value}>` : '';
       }
       return next;
     });
@@ -147,7 +147,7 @@ export function SetupPage() {
               <div className="mb-5 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-liquid-indigo text-white shadow-md shadow-liquid-indigo/25">
                 <ShieldCheck size={20} />
               </div>
-              <h1 className="font-serif text-3xl font-bold text-text-primary">首次配置文档中心</h1>
+              <h1 className="font-serif text-3xl font-bold text-text-primary">首次配置Workloom</h1>
               <p className="mt-3 text-sm leading-6 text-text-secondary">
                 初始化只会在没有任何用户时开放。请使用部署脚本输出的私密链接进入，完成后该入口会自动关闭。
               </p>
@@ -305,7 +305,7 @@ export function SetupPage() {
                             update('mailFrom', e.target.value);
                           }}
                           className={inputCls}
-                          placeholder="文档中心 <your-account@example.com>"
+                          placeholder="Workloom <your-account@example.com>"
                         />
                       </Field>
                       <label className="flex items-center gap-2 pt-6 text-sm text-text-secondary">

@@ -29,7 +29,7 @@ export async function createNotification(p: CreateNotificationPayload) {
       try {
         await sendMail(p.emailFallback);
       } catch (err) {
-        console.warn('[简记] 通知邮件发送失败：', (err as Error).message);
+        console.warn('[Workloom] 通知邮件发送失败：', (err as Error).message);
       }
     }
   }

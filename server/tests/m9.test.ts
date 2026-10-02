@@ -124,7 +124,7 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
     expect(archive.body.list[0].id).toBe(message.id);
   });
 
-  it('管理员可以导出并恢复 JSON 备份', async () => {
+  it.each(['workloom', 'jianji'])('管理员可以导出新备份并恢复 %s JSON 备份', async (appName) => {
     const app = await getApp();
     const { cookie } = await loginAdmin();
     await request(app)
@@ -134,7 +134,8 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
 
     const backup = await request(app).get('/api/admin/backup').set('Cookie', cookie);
     expect(backup.status).toBe(200);
-    expect(backup.body.app).toBe('jianji');
+    expect(backup.body.app).toBe('workloom');
+    expect(backup.headers['content-disposition']).toContain('workloom-backup-');
     expect(backup.body.counts.users).toBeGreaterThan(0);
 
     await request(app)
@@ -144,7 +145,7 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
     const restored = await request(app)
       .post('/api/admin/backup/restore')
       .set('Cookie', cookie)
-      .send({ confirm: 'RESTORE', backup: backup.body });
+      .send({ confirm: 'RESTORE', backup: { ...backup.body, app: appName } });
     expect(restored.status).toBe(200);
 
     const settings = await request(app).get('/api/admin/settings').set('Cookie', cookie);
@@ -152,11 +153,11 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
     expect(settings.body.settings.brand_name).toBe('备份前');
   });
 
-  it('管理员可以导出并恢复包含上传文件的完整迁移包', async () => {
+  it.each(['workloom', 'jianji'])('管理员可以导出新迁移包并恢复 %s 完整迁移包', async (appName) => {
     const app = await getApp();
     const { cookie } = await loginAdmin();
     const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@test.local' } });
-    const rel = 'attachments/test-migration/jianji-note.txt';
+    const rel = 'attachments/test-migration/workloom-note.txt';
     const abs = path.join(UPLOAD_ROOT, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     await fs.writeFile(abs, 'hello migration', 'utf8');
@@ -172,6 +173,8 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
 
     const exported = await request(app).get('/api/admin/migration').set('Cookie', cookie);
     expect(exported.status).toBe(200);
+    expect(exported.body.app).toBe('workloom');
+    expect(exported.headers['content-disposition']).toContain('workloom-migration-');
     expect(exported.body.version).toBe(2);
     expect(exported.body.files.some((f: any) => f.path === rel)).toBe(true);
     expect(exported.body.config.note).toContain('不包含 JWT_SECRET');
@@ -180,7 +183,7 @@ describe('M9 - 评论 / 重复日程 / 备份 / 邮件文件夹', () => {
     const restored = await request(app)
       .post('/api/admin/migration/restore')
       .set('Cookie', cookie)
-      .send({ confirm: 'RESTORE', backup: exported.body });
+      .send({ confirm: 'RESTORE', backup: { ...exported.body, app: appName } });
     expect(restored.status).toBe(200);
     expect(restored.body.restoredFiles).toBeGreaterThan(0);
     await expect(fs.readFile(abs, 'utf8')).resolves.toBe('hello migration');

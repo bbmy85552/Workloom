@@ -76,7 +76,7 @@ export function createApp() {
   app.use(cookieParser());
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, name: 'Document Center API' });
+    res.json({ ok: true, name: 'Workloom API' });
   });
 
   app.use('/mcp', mcpRouter);

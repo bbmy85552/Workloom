@@ -5,22 +5,22 @@ import path from 'node:path';
 
 const chromePath =
   process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const baseUrl = process.env.JIANJI_SCREENSHOT_BASE_URL || 'http://127.0.0.1:3000';
-const email = process.env.JIANJI_SCREENSHOT_EMAIL || 'admin@jianji.local';
-const password = process.env.JIANJI_SCREENSHOT_PASSWORD;
-const width = Number(process.env.JIANJI_SCREENSHOT_WIDTH || 1920);
-const height = Number(process.env.JIANJI_SCREENSHOT_HEIGHT || 1080);
+const baseUrl = process.env.WORKLOOM_SCREENSHOT_BASE_URL || 'http://127.0.0.1:3000';
+const email = process.env.WORKLOOM_SCREENSHOT_EMAIL || 'admin@workloom.local';
+const password = process.env.WORKLOOM_SCREENSHOT_PASSWORD;
+const width = Number(process.env.WORKLOOM_SCREENSHOT_WIDTH || 1920);
+const height = Number(process.env.WORKLOOM_SCREENSHOT_HEIGHT || 1080);
 
 if (!password) {
-  throw new Error('Set JIANJI_SCREENSHOT_PASSWORD before capturing screenshots.');
+  throw new Error('Set WORKLOOM_SCREENSHOT_PASSWORD before capturing screenshots.');
 }
 
 const outputDir = path.resolve('docs/images');
-const userDataDir = '/private/tmp/jianji-readme-chrome';
-const debugPort = Number(process.env.JIANJI_CHROME_DEBUG_PORT || 9333);
+const userDataDir = '/private/tmp/workloom-readme-chrome';
+const debugPort = Number(process.env.WORKLOOM_CHROME_DEBUG_PORT || 9333);
 const demoDocTitle = 'README 展示文档';
 const demoDocContent = `
-  <h1 style="text-align:center">简记文档编辑器</h1>
+  <h1 style="text-align:center">Workloom文档编辑器</h1>
   <p style="text-align:center">
     <span style="color:#5E5CE6"><strong>字号、颜色、对齐、列表与附件</strong></span>
     都可以在同一个编辑界面中完成。
@@ -176,7 +176,8 @@ async function capture(page, route, file) {
   await page.waitForLoad();
   await new Promise((resolve) => setTimeout(resolve, 1000));
   const result = await page.send('Page.captureScreenshot', {
-    format: 'png',
+    format: 'jpeg',
+    quality: 90,
     fromSurface: true,
     clip: { x: 0, y: 0, width, height, scale: 1 },
   });
@@ -222,10 +223,10 @@ try {
   });
 
   const results = [];
-  results.push(await capture(page, '/app/dashboard', 'screenshot-dashboard.png'));
-  results.push(await capture(page, `/app/docs/${demoDocId}`, 'screenshot-doc-editor.png'));
-  results.push(await capture(page, '/app/mail', 'screenshot-mail.png'));
-  results.push(await capture(page, '/admin/settings', 'screenshot-admin-settings.png'));
+  results.push(await capture(page, '/app/docs', 'workloom-knowledge.jpg'));
+  results.push(await capture(page, `/app/docs/${demoDocId}`, 'workloom-editor.jpg'));
+  results.push(await capture(page, '/app/tables', 'workloom-tables.jpg'));
+  results.push(await capture(page, '/app/settings/cli', 'workloom-ai-settings.jpg'));
   page.close();
   console.log(JSON.stringify(results, null, 2));
 } finally {

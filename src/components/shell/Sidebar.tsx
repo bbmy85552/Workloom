@@ -128,7 +128,7 @@ export function Sidebar({ collapsedOverride }: SidebarProps = {}) {
       <div className={`${collapsed ? 'p-2' : 'p-4'} space-y-1 mb-2`}>
         {!collapsed && (
           <a
-            href="https://github.com/staklab/jianji"
+            href="https://github.com/bbmy85552/Workloom"
             target="_blank"
             rel="noreferrer"
             className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-secondary hover:bg-black/5 rounded-xl transition-colors"

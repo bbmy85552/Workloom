@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-const KEY_PREFIX = 'jj_live_';
+const KEY_PREFIX = 'wl_live_';
 
 export function generateApiKey() {
   return `${KEY_PREFIX}${crypto.randomBytes(32).toString('base64url')}`;
