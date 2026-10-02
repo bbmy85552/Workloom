@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { authenticateApiKeyValue, extractApiKeyFromRequest } from '../middleware/apiKeyAuth.js';
-import { createDocsPlatformMcpServer } from '../mcp/server.js';
+import { createWorkloomMcpServer } from '../mcp/server.js';
 import { HttpError } from '../lib/asyncHandler.js';
 
 export const mcpRouter = Router();
@@ -17,17 +17,21 @@ function errorMessage(err: unknown) {
 }
 
 mcpRouter.post('/', async (req, res) => {
-  let server: ReturnType<typeof createDocsPlatformMcpServer> | undefined;
+  let server: ReturnType<typeof createWorkloomMcpServer> | undefined;
   let transport: StreamableHTTPServerTransport | undefined;
   try {
     const user = await authenticateApiKeyValue(extractApiKeyFromRequest(req));
-    server = createDocsPlatformMcpServer(user);
+    server = createWorkloomMcpServer(user);
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    // Keep existing clients working without advertising the retired tool name.
+    const body = req.body?.method === 'tools/call' && req.body?.params?.name === 'docs_platform_me'
+      ? { ...req.body, params: { ...req.body.params, name: 'workloom_me' } }
+      : req.body;
+    await transport.handleRequest(req, res, body);
   } catch (err) {
     if (!res.headersSent) {
       res.status(httpStatusForError(err)).json({

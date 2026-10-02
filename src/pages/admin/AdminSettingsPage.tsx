@@ -11,8 +11,8 @@ export function AdminSettingsPage() {
     allow_public_register: 'true',
     default_workspace_name: '我的空间',
     max_upload_mb: '25',
-    brand_name: '文档中心',
-    company_name: '文档中心',
+    brand_name: 'Workloom',
+    company_name: 'Workloom',
     oa_url: 'https://2dqy-oa.2dqy.com/calendar',
     register_invite_code: '',
   });
@@ -65,7 +65,7 @@ export function AdminSettingsPage() {
 
   const exportBackup = async () => {
     try {
-      await downloadFromApi('/admin/backup', 'jianji-backup.json');
+      await downloadFromApi('/admin/backup', 'workloom-backup.json');
       showToast('备份已开始下载', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -74,7 +74,7 @@ export function AdminSettingsPage() {
 
   const exportMigration = async () => {
     try {
-      await downloadFromApi('/admin/migration', 'jianji-migration.json');
+      await downloadFromApi('/admin/migration', 'workloom-migration.json');
       showToast('完整迁移包已开始下载', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -158,7 +158,7 @@ export function AdminSettingsPage() {
   const startUpdate = async () => {
     const ok = await confirmDialog({
       title: '开始更新',
-      message: '系统会先通知所有用户文档中心正在更新；如果服务器未配置自动更新命令，请按提示在服务器执行更新脚本。',
+      message: '系统会先通知所有用户Workloom正在更新；如果服务器未配置自动更新命令，请按提示在服务器执行更新脚本。',
       confirmText: '开始',
     });
     if (!ok) return;

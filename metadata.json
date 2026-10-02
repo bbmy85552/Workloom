@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Workloom",
+  "description": "A self-hosted collaborative workspace for knowledge, documents, tables, schedules and email.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

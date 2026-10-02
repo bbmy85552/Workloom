@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { env } from '../env.js';
+import { readAuthCookie } from '../lib/cookie.js';
 import { verifyToken, type JwtPayload } from '../lib/jwt.js';
 import { HttpError } from '../lib/asyncHandler.js';
 import { prisma } from '../prisma.js';
@@ -24,7 +24,7 @@ declare global {
 }
 
 function extractToken(req: Request): string | undefined {
-  const cookie = req.cookies?.[env.COOKIE_NAME];
+  const cookie = readAuthCookie(req);
   if (cookie) return cookie;
   const auth = req.headers.authorization;
   if (auth?.startsWith('Bearer ')) return auth.slice(7);

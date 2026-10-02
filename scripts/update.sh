@@ -1,35 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="${JIANJI_PROJECT_DIR:-$(pwd)}"
-BACKUP_DIR="${JIANJI_UPDATE_BACKUP_DIR:-$PROJECT_DIR/.update-backups}"
-SERVICE_NAME="${JIANJI_SERVICE_NAME:-jianji}"
+PROJECT_DIR="${WORKLOOM_PROJECT_DIR:-${JIANJI_PROJECT_DIR:-$(pwd)}}"
+SERVICE_NAME="workloom"
 DOWNLOADED_COMMIT=""
 
 cd "$PROJECT_DIR"
+PROJECT_DIR="$(pwd -P)"
+BACKUP_DIR="${WORKLOOM_UPDATE_BACKUP_DIR:-${JIANJI_UPDATE_BACKUP_DIR:-$PROJECT_DIR/.update-backups}}"
+source scripts/deployment-compat.sh
 
-env_value() {
-  local key="$1"
-  if [ ! -f ".env" ]; then
-    return
-  fi
-  grep -E "^${key}=" .env | tail -n 1 | cut -d= -f2-
-}
+env_value() { workloom_env_value "$1"; }
 
-set_env_value() {
-  local key="$1"
-  local value="$2"
-  local tmp
-  tmp="$(mktemp)"
-  awk -v key="$key" -v value="$value" '
-    BEGIN { done = 0 }
-    $0 ~ "^" key "=" { print key "=" value; done = 1; next }
-    { print }
-    END { if (!done) print key "=" value }
-  ' .env > "$tmp"
-  cat "$tmp" > .env
-  rm -f "$tmp"
-}
+set_env_value() { workloom_set_env "$1" "$2"; }
 
 github_commit_api_url() {
   local repo="${1%.git}"
@@ -84,14 +67,18 @@ remove_runtime_only_files() {
 }
 
 refresh_source_tree() {
-  if [ "${JIANJI_SKIP_SOURCE_REFRESH:-false}" = "true" ]; then
-    echo "Skipping source refresh because JIANJI_SKIP_SOURCE_REFRESH=true."
+  if [ "$(workloom_value SKIP_SOURCE_REFRESH false)" = "true" ]; then
+    echo "Skipping source refresh because WORKLOOM_SKIP_SOURCE_REFRESH=true."
     return
   fi
-  if [ -d ".git" ]; then
+  if [ -e ".git" ]; then
     echo "Pulling latest source ..."
-    git fetch --all --prune
-    git pull --ff-only
+    workloom_migrate_origin
+    git fetch origin --prune
+    local pull_branch
+    pull_branch="$(git branch --show-current 2>/dev/null || true)"
+    pull_branch="${pull_branch:-$(workloom_value UPDATE_BRANCH main)}"
+    git pull --ff-only origin "$pull_branch"
     return
   fi
 
@@ -100,12 +87,12 @@ refresh_source_tree() {
   local archive_url=""
   local check_url=""
   local tmp_dir=""
-  branch="${JIANJI_UPDATE_BRANCH:-$(env_value JIANJI_UPDATE_BRANCH)}"
+  branch="$(workloom_value UPDATE_BRANCH)"
   branch="${branch:-main}"
-  repo="${JIANJI_UPDATE_REPO:-$(env_value JIANJI_UPDATE_REPO)}"
-  repo="${repo:-https://github.com/staklab/jianji.git}"
-  archive_url="${JIANJI_UPDATE_ARCHIVE_URL:-$(env_value JIANJI_UPDATE_ARCHIVE_URL)}"
-  archive_url="${archive_url:-$(github_archive_url "$repo" "$branch")}"
+  repo="$(workloom_value UPDATE_REPO)"
+  repo="$(workloom_current_url "${repo:-https://github.com/bbmy85552/Workloom.git}")"
+  archive_url="$(workloom_value UPDATE_ARCHIVE_URL)"
+  archive_url="$(workloom_current_url "${archive_url:-$(github_archive_url "$repo" "$branch")}")"
   if [ "$archive_url" = "" ] || ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
     echo "No .git directory found and source archive is unavailable; using the current source tree."
     return
@@ -121,44 +108,27 @@ refresh_source_tree() {
   cp -a "$tmp_dir/source/." "$PROJECT_DIR/"
   rm -rf "$tmp_dir"
 
-  check_url="${JIANJI_UPDATE_CHECK_URL:-$(env_value JIANJI_UPDATE_CHECK_URL)}"
-  check_url="${check_url:-$(github_commit_api_url "$repo" "$branch")}"
+  check_url="$(workloom_value UPDATE_CHECK_URL)"
+  check_url="$(workloom_current_url "${check_url:-$(github_commit_api_url "$repo" "$branch")}")"
   DOWNLOADED_COMMIT="$(fetch_commit_from_url "$check_url" || true)"
 }
 
 write_deployment_metadata() {
-  local branch=""
-  local repo=""
-  local commit=""
-  local version=""
-  local check_url=""
+  local branch repo commit version check_url
   branch="$(git branch --show-current 2>/dev/null || true)"
-  branch="${branch:-${JIANJI_UPDATE_BRANCH:-$(env_value JIANJI_UPDATE_BRANCH)}}"
-  branch="${branch:-main}"
+  branch="${branch:-$(workloom_value UPDATE_BRANCH main)}"
   repo="$(git config --get remote.origin.url 2>/dev/null || true)"
-  repo="${repo:-${JIANJI_UPDATE_REPO:-$(env_value JIANJI_UPDATE_REPO)}}"
-  repo="${repo:-https://github.com/staklab/jianji.git}"
+  repo="$(workloom_current_url "${repo:-$(workloom_value UPDATE_REPO https://github.com/bbmy85552/Workloom.git)}")"
   commit="$(git rev-parse HEAD 2>/dev/null || true)"
-  commit="${commit:-${DOWNLOADED_COMMIT:-${JIANJI_CURRENT_COMMIT:-$(env_value JIANJI_CURRENT_COMMIT)}}}"
-  version="$(git describe --tags --always --dirty 2>/dev/null || printf '%s' "${JIANJI_APP_VERSION:-0.1.0}")"
-  check_url="${JIANJI_UPDATE_CHECK_URL:-$(github_commit_api_url "$repo" "${branch:-main}")}"
-  if [ "$check_url" = "" ]; then
-    check_url="https://api.github.com/repos/staklab/jianji/commits/main"
-  fi
+  commit="${commit:-${DOWNLOADED_COMMIT:-$(workloom_value CURRENT_COMMIT)}}"
+  version="$(workloom_value APP_VERSION)"
+  version="${version:-$(git describe --tags --always --dirty 2>/dev/null || printf '0.1.0')}"
+  check_url="$(workloom_current_url "$(workloom_value UPDATE_CHECK_URL "$(github_commit_api_url "$repo" "$branch")")")"
   set_env_value APP_VERSION "$version"
-  set_env_value JIANJI_CURRENT_COMMIT "$commit"
-  set_env_value JIANJI_UPDATE_REPO "$repo"
-  set_env_value JIANJI_UPDATE_BRANCH "$branch"
-  set_env_value JIANJI_UPDATE_CHECK_URL "$check_url"
-  if ! grep -q '^JIANJI_LATEST_VERSION=' .env; then
-    set_env_value JIANJI_LATEST_VERSION "${JIANJI_LATEST_VERSION:-}"
-  fi
-  if ! grep -q '^JIANJI_UPDATE_COMMAND=' .env; then
-    set_env_value JIANJI_UPDATE_COMMAND "${JIANJI_UPDATE_COMMAND:-}"
-  fi
-  if ! grep -q '^JIANJI_UPDATE_ARCHIVE_URL=' .env; then
-    set_env_value JIANJI_UPDATE_ARCHIVE_URL "${JIANJI_UPDATE_ARCHIVE_URL:-}"
-  fi
+  set_env_value WORKLOOM_CURRENT_COMMIT "$commit"
+  set_env_value WORKLOOM_UPDATE_REPO "$repo"
+  set_env_value WORKLOOM_UPDATE_BRANCH "$branch"
+  set_env_value WORKLOOM_UPDATE_CHECK_URL "$check_url"
 }
 
 wait_for_service() {
@@ -184,7 +154,7 @@ wait_for_service() {
 }
 
 if [ ! -f "docker-compose.yml" ] || [ ! -f ".env" ]; then
-  echo "Please run this script from the Jianji deployment directory, or set JIANJI_PROJECT_DIR." >&2
+  echo "Please run this script from the Workloom deployment directory, or set WORKLOOM_PROJECT_DIR." >&2
   exit 1
 fi
 
@@ -196,20 +166,27 @@ if [ -f SETUP_URL.txt ]; then
   cp SETUP_URL.txt "$BACKUP_DIR/SETUP_URL.txt.$STAMP"
 fi
 
-echo "== Jianji safe update =="
+echo "== Workloom safe update =="
 echo "Project: $PROJECT_DIR"
 echo "Config backup: $BACKUP_DIR/.env.$STAMP"
 echo "Docker volumes are preserved. This script does not delete databases or uploads."
 echo
+
+workloom_migrate_config
+workloom_prepare_storage "${COMPOSE_FILE:-docker-compose.yml}"
 
 refresh_source_tree
 
 write_deployment_metadata
 
 echo
-echo "Rebuilding and restarting Jianji ..."
-docker compose up -d --build
-wait_for_service
+echo "Rebuilding and restarting Workloom ..."
+docker compose build "$SERVICE_NAME"
+workloom_stop_previous
+if ! docker compose up -d --no-build "$SERVICE_NAME" || ! wait_for_service; then
+  workloom_restore_previous docker compose
+  exit 1
+fi
 
 echo
 echo "Running service check ..."

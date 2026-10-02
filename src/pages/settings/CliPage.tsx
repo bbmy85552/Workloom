@@ -12,8 +12,8 @@ interface CliApiKeyInfo {
   lastUsedAt?: string | null;
 }
 
-const MCP_URL = 'https://company.2dqy.com/mcp';
-const BASE_URL = 'https://company.2dqy.com';
+const BASE_URL = window.location.origin;
+const MCP_URL = `${BASE_URL}/mcp`;
 
 function formatDate(value?: string | null) {
   if (!value) return '从未使用';
@@ -52,13 +52,13 @@ export function CliPage() {
     };
   }, [showToast]);
 
-  const activeKey = newCliKey || cliKey?.masked || 'jj_live_xxx';
+  const activeKey = newCliKey || cliKey?.masked || 'wl_live_xxx';
 
   const mcpConfig = useMemo(
     () =>
       JSON.stringify(
         {
-          name: 'docs-platform',
+          name: 'Workloom',
           url: MCP_URL,
           headers: {
             Authorization: `Bearer ${activeKey}`,
@@ -81,12 +81,12 @@ export function CliPage() {
     "params": {}
   }'`;
 
-  const cliExample = `export DOCS_PLATFORM_BASE_URL="${BASE_URL}"
-export DOCS_PLATFORM_API_KEY="${activeKey}"
+  const cliExample = `export WORKLOOM_BASE_URL="${BASE_URL}"
+export WORKLOOM_API_KEY="${activeKey}"
 
-npm run docs-platform -- docs list
-npm run docs-platform -- docs create --title "AI 笔记" --content "<p>Hello</p>"
-npm run docs-platform -- tables list`;
+npm run workloom -- docs list
+npm run workloom -- docs create --title "AI 笔记" --content "<p>Hello</p>"
+npm run workloom -- tables list`;
 
   const regenerateCliKey = async () => {
     if (cliKey && !window.confirm('重建后旧 API Key 会立即失效，继续吗？')) return;
@@ -211,7 +211,7 @@ npm run docs-platform -- tables list`;
           <div>
             <div className="text-sm font-semibold text-text-primary mb-2">远程 MCP</div>
             <p className="text-xs text-text-secondary">
-              支持远程 MCP 的客户端可以直接连接 docs-platform，不需要下载源码。
+              支持远程 MCP 的客户端可以直接连接 Workloom，不需要下载源码。
             </p>
           </div>
           <Field label="MCP 地址">

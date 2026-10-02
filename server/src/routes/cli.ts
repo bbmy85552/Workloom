@@ -1,3 +1,4 @@
+import { FOLDER_CONTENT, isFolderContent } from '../lib/folder.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../prisma.js';
@@ -8,7 +9,6 @@ import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
 export const cliRouter = Router();
 cliRouter.use(requireApiKey);
 
-const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
 const FIELD_TYPES = [
   'text',
   'longtext',
@@ -27,10 +27,6 @@ const FIELD_TYPES = [
   'attachment',
   'formula',
 ] as const;
-
-function isFolderContent(contentJson: string | null | undefined) {
-  return (contentJson ?? '').includes('data-jianji-type="folder"');
-}
 
 function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
   return { ...doc, isFolder: isFolderContent(doc.contentJson) };

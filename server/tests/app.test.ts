@@ -11,11 +11,11 @@ describe('应用安全与部署适配', () => {
     const app = await getApp();
     const res = await request(app)
       .options('/api/health')
-      .set('Origin', 'https://jianji.example.com')
-      .set('Host', 'jianji.example.com')
+      .set('Origin', 'https://workloom.example.com')
+      .set('Host', 'workloom.example.com')
       .set('Access-Control-Request-Method', 'GET');
 
-    expect(res.headers['access-control-allow-origin']).toBe('https://jianji.example.com');
+    expect(res.headers['access-control-allow-origin']).toBe('https://workloom.example.com');
     expect(res.headers['access-control-allow-credentials']).toBe('true');
   });
 
@@ -24,7 +24,7 @@ describe('应用安全与部署适配', () => {
     const res = await request(app)
       .options('/api/health')
       .set('Origin', 'https://evil.example.com')
-      .set('Host', 'jianji.example.com')
+      .set('Host', 'workloom.example.com')
       .set('Access-Control-Request-Method', 'GET');
 
     expect(res.headers['access-control-allow-origin']).toBeUndefined();

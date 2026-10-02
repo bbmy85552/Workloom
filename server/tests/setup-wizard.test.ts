@@ -44,7 +44,13 @@ describe('first-run setup wizard', () => {
     const cookieHeader = valid.headers['set-cookie'];
     const cookieText = Array.isArray(cookieHeader) ? cookieHeader.join('') : String(cookieHeader);
     expect(valid.status).toBe(200);
-    expect(cookieText).toContain('jianji_setup');
+    expect(cookieText).toContain('workloom_setup');
+    const cookies = Array.isArray(cookieHeader) ? cookieHeader : [String(cookieHeader)];
+    const currentCookie = cookies.find((value) => value.startsWith('workloom_setup='))!;
+    const legacyCookie = currentCookie.split(';')[0].replace('workloom_setup=', 'jianji_setup=');
+    const session = await request(app).get('/api/setup/session').set('Cookie', legacyCookie);
+    expect(session.status).toBe(200);
+    expect(session.body.ok).toBe(true);
   });
 
   it('creates the administrator and stores smtp secrets encrypted', async () => {
@@ -58,7 +64,7 @@ describe('first-run setup wizard', () => {
     await agent
       .post('/api/setup/complete')
       .send({
-        appUrl: 'https://jianji.example.com',
+        appUrl: 'https://workloom.example.com',
         adminEmail: 'owner@example.com',
         adminName: 'Owner',
         adminPassword: 'Owner@123456',
@@ -68,7 +74,7 @@ describe('first-run setup wizard', () => {
         mailSecure: true,
         mailUser: 'owner@example.com',
         mailPass: 'smtp-secret-pass',
-        mailFrom: '简记 <owner@example.com>',
+        mailFrom: 'Workloom <owner@example.com>',
         verifySmtp: false,
       })
       .expect(200);

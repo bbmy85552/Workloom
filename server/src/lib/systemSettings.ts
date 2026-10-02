@@ -73,11 +73,17 @@ export async function verifyRegisterInviteCode(inviteCode: string) {
   return inviteCode.trim() === expected;
 }
 
+export function normalizeBrandName(value: string | undefined) {
+  const name = value?.trim();
+  // Upgrade historical defaults in responses without rewriting custom database settings.
+  return !name || ['文档中心', '简记', 'jianji'].includes(name.toLowerCase()) ? 'Workloom' : name;
+}
+
 export async function getPublicBrandSettings() {
   const map = await getSystemSettingMap();
   return {
-    brandName: map[SYSTEM_SETTING_KEYS.brandName]?.trim() || '文档中心',
-    companyName: map[SYSTEM_SETTING_KEYS.companyName]?.trim() || '文档中心',
+    brandName: normalizeBrandName(map[SYSTEM_SETTING_KEYS.brandName]),
+    companyName: normalizeBrandName(map[SYSTEM_SETTING_KEYS.companyName]),
     oaUrl: map[SYSTEM_SETTING_KEYS.oaUrl]?.trim() || 'https://2dqy-oa.2dqy.com/calendar',
     googleClientId: env.GOOGLE_CLIENT_ID,
   };
@@ -85,10 +91,10 @@ export async function getPublicBrandSettings() {
 
 export async function getMailBrandName() {
   const map = await getSystemSettingMap();
-  return (
+  return normalizeBrandName(
     map[SYSTEM_SETTING_KEYS.companyName]?.trim() ||
     map[SYSTEM_SETTING_KEYS.brandName]?.trim() ||
-    '文档中心'
+    undefined
   );
 }
 

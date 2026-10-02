@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
+import { readBrowserValue, writeBrowserValue } from '../lib/browserStorage';
 
 export type DialogKind = 'alert' | 'confirm' | 'prompt';
 
@@ -60,9 +61,9 @@ interface UiState {
   resolveDialog: (id: number, result: { ok: boolean; value?: string }) => void;
 }
 
-const SIDEBAR_KEY = 'jianji.sidebarCollapsed';
-const initialCollapsed =
-  typeof window !== 'undefined' && window.localStorage?.getItem(SIDEBAR_KEY) === '1';
+const SIDEBAR_KEY = 'workloom.sidebarCollapsed';
+const LEGACY_SIDEBAR_KEY = 'jianji.sidebarCollapsed';
+const initialCollapsed = readBrowserValue(SIDEBAR_KEY, LEGACY_SIDEBAR_KEY) === '1';
 
 let toastId = 0;
 let dialogId = 0;
@@ -74,19 +75,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleCollapsed: () =>
     set((s) => {
       const next = !s.sidebarCollapsed;
-      try {
-        window.localStorage?.setItem(SIDEBAR_KEY, next ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
+      writeBrowserValue(SIDEBAR_KEY, next ? '1' : '0', LEGACY_SIDEBAR_KEY);
       return { sidebarCollapsed: next };
     }),
   setCollapsed: (v) => {
-    try {
-      window.localStorage?.setItem(SIDEBAR_KEY, v ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
+    writeBrowserValue(SIDEBAR_KEY, v ? '1' : '0', LEGACY_SIDEBAR_KEY);
     set({ sidebarCollapsed: v });
   },
   toast: null,

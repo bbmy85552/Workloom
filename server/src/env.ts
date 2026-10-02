@@ -18,6 +18,8 @@ function toInt(v: string | undefined, def: number) {
 
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+const updateRepo = process.env.WORKLOOM_UPDATE_REPO ?? process.env.JIANJI_UPDATE_REPO ?? 'https://github.com/bbmy85552/Workloom.git';
+const updateCheckUrl = process.env.WORKLOOM_UPDATE_CHECK_URL ?? process.env.JIANJI_UPDATE_CHECK_URL ?? 'https://api.github.com/repos/bbmy85552/Workloom/commits/main';
 
 export const env = {
   NODE_ENV: nodeEnv,
@@ -29,7 +31,7 @@ export const env = {
 
   JWT_SECRET: process.env.JWT_SECRET ?? 'dev-secret-change-me',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '7d',
-  COOKIE_NAME: process.env.COOKIE_NAME ?? 'jianji_session',
+  COOKIE_NAME: process.env.COOKIE_NAME ?? 'workloom_session',
   COOKIE_SECURE: toBool(process.env.COOKIE_SECURE, false),
   SETUP_TOKEN: process.env.SETUP_TOKEN ?? '',
 
@@ -43,7 +45,7 @@ export const env = {
   MAIL_SECURE: toBool(process.env.MAIL_SECURE, true),
   MAIL_USER: process.env.MAIL_USER ?? '',
   MAIL_PASS: process.env.MAIL_PASS ?? '',
-  MAIL_FROM: process.env.MAIL_FROM ?? '文档中心 <no-reply@jianji.local>',
+  MAIL_FROM: process.env.MAIL_FROM ?? 'Workloom <no-reply@workloom.local>',
 
   GOOGLE_CLIENT_ID:
     process.env.GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '',
@@ -58,13 +60,19 @@ export const env = {
   ALLOW_PUBLIC_REGISTER: toBool(process.env.ALLOW_PUBLIC_REGISTER, true),
 
   APP_VERSION: process.env.APP_VERSION ?? '',
-  JIANJI_LATEST_VERSION: process.env.JIANJI_LATEST_VERSION ?? '',
-  JIANJI_CURRENT_COMMIT: process.env.JIANJI_CURRENT_COMMIT ?? '',
-  JIANJI_UPDATE_REPO: process.env.JIANJI_UPDATE_REPO ?? 'https://github.com/staklab/jianji.git',
-  JIANJI_UPDATE_BRANCH: process.env.JIANJI_UPDATE_BRANCH ?? 'main',
-  JIANJI_UPDATE_CHECK_URL:
-    process.env.JIANJI_UPDATE_CHECK_URL ?? 'https://api.github.com/repos/staklab/jianji/commits/main',
-  JIANJI_UPDATE_COMMAND: process.env.JIANJI_UPDATE_COMMAND ?? '',
+  WORKLOOM_LATEST_VERSION: process.env.WORKLOOM_LATEST_VERSION ?? process.env.JIANJI_LATEST_VERSION ?? '',
+  WORKLOOM_CURRENT_COMMIT: process.env.WORKLOOM_CURRENT_COMMIT ?? process.env.JIANJI_CURRENT_COMMIT ?? '',
+  // Upgrade known historical defaults, while retaining explicitly configured custom forks.
+  WORKLOOM_UPDATE_REPO: updateRepo.replace(
+    /^https:\/\/github\.com\/(?:staklab|bbmy85552)\/jianji(?:\.git)?\/?$/i,
+    'https://github.com/bbmy85552/Workloom.git',
+  ),
+  WORKLOOM_UPDATE_BRANCH: process.env.WORKLOOM_UPDATE_BRANCH ?? process.env.JIANJI_UPDATE_BRANCH ?? 'main',
+  WORKLOOM_UPDATE_CHECK_URL: updateCheckUrl.replace(
+    /^https:\/\/api\.github\.com\/repos\/(?:staklab|bbmy85552)\/jianji\//i,
+    'https://api.github.com/repos/bbmy85552/Workloom/',
+  ),
+  WORKLOOM_UPDATE_COMMAND: process.env.WORKLOOM_UPDATE_COMMAND ?? process.env.JIANJI_UPDATE_COMMAND ?? '',
 };
 
 export function assertSafeProductionEnv(options: { initialized?: boolean } = {}) {

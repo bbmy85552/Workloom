@@ -14,7 +14,8 @@ import { countInWindow, recordEvent } from '../lib/rateLimit.js';
 
 export const setupRouter = Router();
 
-const SETUP_COOKIE = 'jianji_setup';
+const SETUP_COOKIE = 'workloom_setup';
+const LEGACY_SETUP_COOKIE = 'jianji_setup';
 const SETUP_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
 const emailSchema = z.string().email('邮箱格式不合法').max(120);
@@ -35,6 +36,7 @@ function setSetupCookie(res: Response, token: string) {
 
 function clearSetupCookie(res: Response) {
   res.clearCookie(SETUP_COOKIE, { path: '/api/setup' });
+  res.clearCookie(LEGACY_SETUP_COOKIE, { path: '/api/setup' });
 }
 
 function clientIp(req: Request) {
@@ -53,7 +55,7 @@ function signSetupSession() {
 }
 
 function hasValidSetupSession(req: Request) {
-  const token = req.cookies?.[SETUP_COOKIE];
+  const token = req.cookies?.[SETUP_COOKIE] || req.cookies?.[LEGACY_SETUP_COOKIE];
   if (!token) return false;
   try {
     const payload = jwt.verify(token, env.JWT_SECRET) as { scope?: string };

@@ -2,10 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma } from '../prisma.js';
-import { env } from '../env.js';
 import { hashPassword, verifyPassword } from '../lib/hash.js';
 import { signToken } from '../lib/jwt.js';
-import { setAuthCookie, clearAuthCookie } from '../lib/cookie.js';
+import { setAuthCookie, clearAuthCookie, readAuthCookie } from '../lib/cookie.js';
 import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { consumeVerificationCode, requestVerificationCode } from '../lib/verifyCode.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -226,7 +225,7 @@ authRouter.post(
   '/logout',
   asyncHandler(async (req, res) => {
     const token =
-      req.cookies?.[env.COOKIE_NAME] ||
+      readAuthCookie(req) ||
       (req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : undefined);

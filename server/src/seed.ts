@@ -22,9 +22,9 @@ export async function ensureSeed(options: { createAdminFromEnv?: boolean } = {})
       data: { name: '默认空间', ownerId: admin.id, kind: 'PRIVATE' },
     });
     if (env.NODE_ENV === 'production') {
-      console.log(`[简记] 已创建默认管理员账号: ${adminEmail}`);
+      console.log(`[Workloom] 已创建默认管理员账号: ${adminEmail}`);
     } else {
-      console.log(`[简记] 已创建默认管理员账号: ${adminEmail} / ${env.ADMIN_PASSWORD}`);
+      console.log(`[Workloom] 已创建默认管理员账号: ${adminEmail} / ${env.ADMIN_PASSWORD}`);
     }
   }
   if (!admin) {
@@ -39,7 +39,7 @@ export async function ensureSeed(options: { createAdminFromEnv?: boolean } = {})
     await prisma.workspace.create({
       data: { name: '公共知识库', ownerId: admin.id, kind: 'PUBLIC' },
     });
-    console.log('[简记] 已创建系统级公共知识库');
+    console.log('[Workloom] 已创建系统级公共知识库');
   }
 }
 

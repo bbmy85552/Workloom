@@ -80,7 +80,7 @@ export function applyThemeColor(value?: string | null, mode?: ResolvedTheme) {
   root.style.setProperty('--color-primary-container', primaryContainer);
   root.style.setProperty('--color-surface-tint', color);
   root.style.setProperty('--color-on-primary', luminance(color) > 0.55 ? '#111827' : '#ffffff');
-  root.style.setProperty('--jianji-theme-color', color);
+  root.style.setProperty('--workloom-theme-color', color);
   return color;
 }
 

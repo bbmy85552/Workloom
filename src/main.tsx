@@ -13,7 +13,7 @@ void fetchPublicSettings()
     document.title = settings.brandName;
   })
   .catch(() => {
-    document.title = '文档中心';
+    document.title = 'Workloom';
   });
 
 createRoot(document.getElementById('root')!).render(

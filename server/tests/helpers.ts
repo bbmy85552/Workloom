@@ -66,12 +66,18 @@ export async function registerUser(email: string, name = 'Tester', password = 'A
     update: { value: TEST_INVITE_CODE },
     create: { key: 'register_invite_code', value: TEST_INVITE_CODE },
   });
-  await request(app).post('/api/auth/register-code').send({ email, inviteCode: TEST_INVITE_CODE });
+  const codeResponse = await request(app).post('/api/auth/register-code').send({ email, inviteCode: TEST_INVITE_CODE });
+  if (codeResponse.status !== 200) {
+    throw new Error(`register-code failed (${codeResponse.status}): ${JSON.stringify(codeResponse.body)}`);
+  }
   const code = readCode(email, 'register');
   if (!code) throw new Error('test code not captured');
   const res = await request(app)
     .post('/api/auth/register')
     .send({ email, code, password, name, inviteCode: TEST_INVITE_CODE });
+  if (res.status !== 200 || !res.headers['set-cookie']) {
+    throw new Error(`register failed (${res.status}): ${JSON.stringify(res.body)}`);
+  }
   return { res, cookie: res.headers['set-cookie'] as unknown as string[], password };
 }
 
