@@ -44,7 +44,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   const location = useLocation();
   if (status !== 'ready') return <FullPageLoading />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (user.role !== 'ADMIN') return <Navigate to="/app/dashboard" replace />;
+  if (user.role !== 'ADMIN') return <Navigate to="/app/docs" replace />;
   return <>{children}</>;
 }
 
@@ -59,7 +59,7 @@ export function RequireGuest() {
     const next = params.get('next');
     const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
     const dest = next ?? from;
-    const safe = dest && dest.startsWith('/') && !dest.startsWith('//') ? dest : '/app/dashboard';
+    const safe = dest && dest.startsWith('/') && !dest.startsWith('//') ? dest : '/app/docs';
     return <Navigate to={safe} replace />;
   }
   return <Outlet />;

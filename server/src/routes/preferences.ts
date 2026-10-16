@@ -29,7 +29,7 @@ const prefSchema = z.object({
 const DEFAULTS = {
   theme: 'system',
   themeColor: '#5E5CE6',
-  defaultHome: '/app/dashboard',
+  defaultHome: '/app/docs',
   editorFontFamily: null as string | null,
   editorFontSize: 16,
   autoSaveSeconds: 1,
