@@ -132,6 +132,18 @@ export function DocsListPage() {
     [syncFolderUrl],
   );
 
+  // 打开文档时把当前列表位置（tab/文件夹）透传给详情页，详情页「返回」时原样回到这里，
+  // 不再靠文档归属猜测返回位置（猜错会把用户丢到「共享给我」）。
+  const openDoc = useCallback(
+    (docId: string, from?: { tab: Tab; folder: string | null }) => {
+      const folder = tab === 'mine' ? mineFolderId : tab === 'public' ? publicFolderId : null;
+      navigate(`/app/docs/${docId}`, {
+        state: { docsFrom: from ?? { tab, folder } },
+      });
+    },
+    [navigate, tab, mineFolderId, publicFolderId],
+  );
+
   useEffect(() => {
     localStorage.setItem('docs.layout', layout);
   }, [layout]);
@@ -190,7 +202,7 @@ export function DocsListPage() {
         );
         setCreateOpen(null);
         if (imported.length === 1) {
-          navigate(`/app/docs/${imported[0].id}`);
+          openDoc(imported[0].id);
         }
       } else {
         const { data } = await api.post<{ doc: DocNode }>('/docs', {
@@ -212,7 +224,7 @@ export function DocsListPage() {
           }
           showToast('文件夹已创建', 'success');
         } else {
-          navigate(`/app/docs/${data.doc.id}`);
+          openDoc(data.doc.id);
         }
       }
     } catch (err) {
@@ -304,7 +316,7 @@ export function DocsListPage() {
       await load();
       showToast(data.copiedCount > 1 ? `已复制 ${data.copiedCount} 个文档到公共知识库` : '已复制到公共知识库', 'success');
       setTab('public');
-      navigate(`/app/docs/${data.doc.id}`);
+      openDoc(data.doc.id, { tab: 'public', folder: null });
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
@@ -325,7 +337,7 @@ export function DocsListPage() {
         focusFolderLocation('public', data.doc.id);
       } else {
         setTab('public');
-        navigate(`/app/docs/${data.doc.id}`);
+        openDoc(data.doc.id, { tab: 'public', folder: null });
       }
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -347,7 +359,7 @@ export function DocsListPage() {
         focusFolderLocation('mine', data.doc.id);
       } else {
         setTab('mine');
-        navigate(`/app/docs/${data.doc.id}`);
+        openDoc(data.doc.id, { tab: 'mine', folder: null });
       }
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -709,7 +721,7 @@ export function DocsListPage() {
           <DocTree
             tree={treeNodes}
             canManage={canManage}
-            onSelect={(doc) => navigate(`/app/docs/${doc.id}`)}
+            onSelect={(doc) => openDoc(doc.id)}
             onCreateChild={
               treeSupportsManage
                 ? (parent) => {
@@ -781,7 +793,7 @@ export function DocsListPage() {
                   if (doc.isFolder) {
                     if (tab === 'mine') openMineFolder(doc.id);
                     else openPublicFolder(doc.id);
-                  } else navigate(`/app/docs/${doc.id}`);
+                  } else openDoc(doc.id);
                 }}
                 className={`glass-card rounded-xl p-4 w-full text-left flex items-start gap-3 border transition-all duration-200 ${
                   doc.isFolder
