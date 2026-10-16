@@ -17,7 +17,7 @@ type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 const DEFAULT_PREF: UserPreferences = {
   theme: 'system',
   themeColor: DEFAULT_THEME_COLOR,
-  defaultHome: '/app/dashboard',
+  defaultHome: '/app/docs',
   editorFontFamily: null,
   editorFontSize: 16,
   autoSaveSeconds: 1,

@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <Navigate to="/app/dashboard" replace />,
+        element: <Navigate to="/app/docs" replace />,
       },
       { path: '/setup', element: <SetupPage /> },
       {
@@ -57,7 +57,7 @@ export const router = createBrowserRouter([
           </RequireAuth>
         ),
         children: [
-          { index: true, element: <Navigate to="/app/dashboard" replace /> },
+          { index: true, element: <Navigate to="/app/docs" replace /> },
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'docs', element: <DocsListPage /> },
           { path: 'docs/:id', element: <DocDetailPage /> },
