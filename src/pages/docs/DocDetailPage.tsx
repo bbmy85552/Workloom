@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ChevronLeft,
   Trash2,
@@ -86,6 +86,26 @@ export function DocDetailPage() {
     isPublic: false,
   });
   const role = access.role;
+  const location = useLocation();
+  // 列表页打开文档时会把来源位置（tab/文件夹）放在路由 state 里，返回时优先原样带回；
+  // 没有来源信息（直达链接、仪表盘等）时才回退到按文档归属推断的旧逻辑。
+  const docsFrom = (
+    location.state as { docsFrom?: { tab?: string; folder?: string | null } } | null
+  )?.docsFrom;
+  const backToList = useCallback(() => {
+    const tab = docsFrom?.tab;
+    if (tab && ['mine', 'public', 'shared', 'favorites'].includes(tab)) {
+      const params = new URLSearchParams();
+      if (tab !== 'mine') params.set('tab', tab);
+      if (docsFrom?.folder) params.set('folder', docsFrom.folder);
+      const qs = params.toString();
+      navigate(qs ? `/app/docs?${qs}` : '/app/docs');
+    } else if (doc) {
+      navigate(docsListPathForDoc(doc, access, me?.id));
+    } else {
+      navigate('/app/docs');
+    }
+  }, [navigate, docsFrom, doc, access, me?.id]);
   const [title, setTitle] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -241,8 +261,11 @@ export function DocDetailPage() {
             : docRes.data.doc.workspace?.ownerId === me?.id
               ? 'mine'
               : 'shared';
+          const fromTab = docsFrom?.tab;
+          const effectiveTab =
+            fromTab && ['mine', 'public', 'shared', 'favorites'].includes(fromTab) ? fromTab : nextTab;
           navigate(
-            nextTab === 'shared' ? '/app/docs?tab=shared' : `/app/docs?tab=${nextTab}&folder=${docRes.data.doc.id}`,
+            effectiveTab === 'shared' ? '/app/docs?tab=shared' : `/app/docs?tab=${effectiveTab}&folder=${docRes.data.doc.id}`,
             { replace: true },
           );
           return;
@@ -265,10 +288,10 @@ export function DocDetailPage() {
         void loadComments();
       } catch (err) {
         showToast(asApiError(err).error, 'error');
-        navigate('/app/docs');
+        backToList();
       }
     })();
-  }, [id, me?.id, navigate, showToast, loadAttachments, loadComments]);
+  }, [id, me?.id, navigate, showToast, loadAttachments, loadComments, backToList]);
 
   const handleTitle = (v: string) => {
     if (!canWrite) return;
@@ -295,7 +318,7 @@ export function DocDetailPage() {
     if (!ok) return;
     try {
       await api.delete(`/docs/${id}`);
-      navigate(docsListPathForDoc(doc, access, me?.id));
+      backToList();
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
@@ -371,7 +394,7 @@ export function DocDetailPage() {
         parentId: doc?.parentId ?? null,
       });
       showToast('已导入为新文档', 'success');
-      navigate(`/app/docs/${data.doc.id}`);
+      navigate(`/app/docs/${data.doc.id}`, { state: location.state });
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     } finally {
@@ -574,10 +597,7 @@ export function DocDetailPage() {
     <div className="py-4 sm:py-6 animate-fade-in-up">
       <div className="no-print flex items-center justify-between mb-4 gap-2 flex-wrap">
         <button
-          onClick={() => {
-            if (doc) navigate(docsListPathForDoc(doc, access, me?.id));
-            else navigate('/app/docs');
-          }}
+          onClick={backToList}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-liquid-indigo transition-colors"
         >
           <ChevronLeft size={16} /> 返回文档列表
