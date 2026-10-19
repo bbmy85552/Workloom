@@ -50,6 +50,9 @@ function htmlWithAbsoluteImages(html: string) {
   return box.innerHTML;
 }
 
+// 自动保存防抖：停手 10 秒才保存，避免逐字编辑时频繁发请求、被在途保存堵住
+const AUTOSAVE_DELAY_MS = 10_000;
+
 export function DocDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -111,6 +114,8 @@ export function DocDetailPage() {
   const updatedAtRef = useRef<string | null>(null);
   const titleRef = useRef('');
   const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
+  const retryCountRef = useRef(0);
   const conflictRef = useRef(false);
   const uploadBusyRef = useRef(false);
 
@@ -122,10 +127,19 @@ export function DocDetailPage() {
     async (opts?: { force?: boolean }) => {
       if (!id) return;
       while (saveInFlightRef.current) await saveInFlightRef.current;
-      if (!opts?.force && conflictRef.current) return;
 
       const draft = { ...draftRef.current };
       if (!opts?.force && draft.title === undefined && draft.contentJson === undefined) return;
+      // 冲突未解决时只冻结正文保存；标题是单字段，继续走下面的无校验通道
+      if (!opts?.force && conflictRef.current && draft.contentJson !== undefined) return;
+
+      // 标题删空时不发请求：服务端不接受空标题，发出去必然失败、还会堵住后续保存。
+      // 空标题先留在草稿里，等改成非空时再发；本次若没有其他可发内容就直接返回。
+      const sendDraft = { ...draft };
+      if (sendDraft.title !== undefined && sendDraft.title.trim() === '') delete sendDraft.title;
+      if (!opts?.force && sendDraft.title === undefined && sendDraft.contentJson === undefined) return;
+      // 只改了标题时不带版本校验：标题后写者胜，没必要被正文的版本冲突连累
+      const titleOnly = sendDraft.title !== undefined && sendDraft.contentJson === undefined;
 
       const request = (async () => {
         setSaveStatus('saving');
@@ -133,23 +147,28 @@ export function DocDetailPage() {
           const payload = {
             ...(opts?.force
               ? { title: titleRef.current, contentJson: editorRef.current?.editor?.getHTML() ?? '' }
-              : draft),
-            ...(opts?.force ? { force: true } : { expectedUpdatedAt: updatedAtRef.current ?? undefined }),
+              : sendDraft),
+            ...(opts?.force
+              ? { force: true }
+              : titleOnly
+                ? {}
+                : { expectedUpdatedAt: updatedAtRef.current ?? undefined }),
           };
           const { data } = await api.patch<{ doc: DocDetail }>(`/docs/${id}`, payload);
 
           // Only remove fields included in this request. Edits made while it was saving stay queued.
-          if (draft.title !== undefined && draftRef.current.title === draft.title) {
+          if (sendDraft.title !== undefined && draftRef.current.title === sendDraft.title) {
             delete draftRef.current.title;
           }
-          if (draft.contentJson !== undefined && draftRef.current.contentJson === draft.contentJson) {
+          if (sendDraft.contentJson !== undefined && draftRef.current.contentJson === sendDraft.contentJson) {
             delete draftRef.current.contentJson;
           }
+          retryCountRef.current = 0;
           updatedAtRef.current = data.doc.updatedAt;
           setDoc(data.doc);
           const hasPendingDraft =
             draftRef.current.title !== undefined || draftRef.current.contentJson !== undefined;
-          setSaveStatus(hasPendingDraft ? 'dirty' : 'saved');
+          setSaveStatus(conflictRef.current ? 'conflict' : hasPendingDraft ? 'dirty' : 'saved');
         } catch (err) {
           const apiErr = asApiError(err);
           if (apiErr.code === 'DOC_CONFLICT') {
@@ -170,7 +189,14 @@ export function DocDetailPage() {
             return;
           }
           setSaveStatus('dirty');
-          showToast(apiErr.error, 'error');
+          // 保存失败自动重试（最多 3 次，间隔递增），不再让一次失败把草稿永久堵在队列里；
+          // 只在第一次失败时弹提示，重试期间不反复打扰
+          if (retryCountRef.current === 0) showToast(apiErr.error, 'error');
+          if (retryCountRef.current < 3) {
+            retryCountRef.current += 1;
+            if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = window.setTimeout(() => void flushSave(), 2000 * retryCountRef.current);
+          }
         }
       })();
 
@@ -186,18 +212,19 @@ export function DocDetailPage() {
 
   const scheduleSave = useCallback(() => {
     if (!canWrite) return;
-    // 冲突未解决期间暂停自动保存，避免继续打字触发新保存覆盖冲突状态
-    if (conflict) return;
-    setSaveStatus('dirty');
+    // 冲突未解决期间，正文保存会被 flushSave 拦下，但标题仍可保存；
+    // 徽章保持 conflict，不切成 dirty，免得冲突提示消失
+    if (!conflict) setSaveStatus('dirty');
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       void flushSave();
-    }, 1000);
+    }, AUTOSAVE_DELAY_MS);
   }, [flushSave, canWrite, conflict]);
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
       void flushSave();
     };
   }, [flushSave]);
@@ -540,7 +567,7 @@ export function DocDetailPage() {
     if (draftRef.current.title !== undefined || draftRef.current.contentJson !== undefined) {
       setSaveStatus('dirty');
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = window.setTimeout(() => void flushSave(), 1000);
+      saveTimerRef.current = window.setTimeout(() => void flushSave(), AUTOSAVE_DELAY_MS);
     }
   };
 
