@@ -859,6 +859,7 @@ export function DocDetailPage() {
             onClose={() => setShareOpen(false)}
             resourceType="doc"
             resourceId={doc.id}
+            resourceTitle={title}
             canManage={canInvite}
           />
           <VersionDrawer

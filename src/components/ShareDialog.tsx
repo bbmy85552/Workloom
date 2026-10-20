@@ -12,6 +12,7 @@ interface ShareDialogProps {
   resourceType: 'doc' | 'table' | 'memory';
   resourceId: string;
   canManage: boolean;
+  resourceTitle?: string;
 }
 
 function collaboratorBase(resourceType: ShareDialogProps['resourceType'], resourceId: string) {
@@ -26,7 +27,7 @@ const RESOURCE_LABEL: Record<ShareDialogProps['resourceType'], string> = {
   memory: '项目记忆',
 };
 
-export function ShareDialog({ open, onClose, resourceType, resourceId, canManage }: ShareDialogProps) {
+export function ShareDialog({ open, onClose, resourceType, resourceId, canManage, resourceTitle }: ShareDialogProps) {
   // 项目记忆只支持协作者，不支持公开分享链接
   const supportsLinks = resourceType !== 'memory';
   const showToast = useUiStore((s) => s.showToast);
@@ -135,15 +136,39 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
 
   const copyLink = async (token: string) => {
     const url = `${window.location.origin}/share/${token}`;
+    // 复制时带上标题：粘贴到聊天里对方一眼能看出是什么文档。
+    // 富文本目标（文档/邮件）呈现为以标题为文字的链接；纯文本目标是「标题 + 链接」两行。
+    const displayTitle = resourceTitle?.trim() || `${RESOURCE_LABEL[resourceType]}分享`;
+    const plainText = `${displayTitle}\n${url}`;
+    const escapedTitle = displayTitle
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const htmlText = `<a href="${url}">${escapedTitle}</a>`;
     try {
-      await navigator.clipboard.writeText(url);
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([plainText], { type: 'text/plain' }),
+            'text/html': new Blob([htmlText], { type: 'text/html' }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
       showToast('链接已复制', 'success');
     } catch {
-      await alertDialog({
-        title: '请手动复制链接',
-        message: url,
-        mono: true,
-      });
+      try {
+        await navigator.clipboard.writeText(plainText);
+        showToast('链接已复制', 'success');
+      } catch {
+        await alertDialog({
+          title: '请手动复制链接',
+          message: plainText,
+          mono: true,
+        });
+      }
     }
   };
 

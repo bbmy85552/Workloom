@@ -472,6 +472,7 @@ export function TableDetailPage() {
           onClose={() => setShareOpen(false)}
           resourceType="table"
           resourceId={table.id}
+          resourceTitle={table.name}
           canManage={role === 'OWNER'}
         />
       )}
