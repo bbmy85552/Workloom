@@ -91,6 +91,19 @@ export function MemoryListPage() {
         </p>
       </header>
 
+      <section className="glass-card rounded-2xl p-5 sm:p-6 mb-6">
+        <h2 className="text-base font-semibold text-text-primary mb-2">什么是项目记忆？</h2>
+        <p className="text-sm text-text-secondary leading-relaxed">
+          项目记忆是每个项目的长期笔记本：项目背景、关键事实、技术决策和团队偏好都沉淀在这里，人和 AI 随时查阅，不用每次重新交代背景。
+        </p>
+        <p className="text-sm text-text-secondary leading-relaxed mt-2">
+          AI 工具（Claude、Cursor、Claude Code 等）可通过 MCP 直接读写这些记忆：开始工作前先读取掌握上下文，得出新决策时顺手记录，下次无缝衔接。
+        </p>
+        <p className="text-sm text-text-secondary leading-relaxed mt-2">
+          适合记录：事实（背景与现状）、决策（定了什么以及为什么）、偏好（团队约定与禁忌）、笔记（日常记录）、待办（尚未完成的事）。可见范围上，私人项目仅自己与受邀协作者可见，公共项目团队所有登录用户可查看，也可以把某个项目单独共享给指定同事。
+        </p>
+      </section>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div className="flex items-center gap-1 bg-black/5 rounded-xl p-1 w-fit text-sm">
           {TABS.map((t) => (
