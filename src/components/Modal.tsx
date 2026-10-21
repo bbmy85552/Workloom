@@ -36,7 +36,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-black/35"
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/35"
       style={{ minHeight: '100dvh' }}
       role="dialog"
       aria-modal="true"
@@ -45,20 +45,20 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
       }}
     >
       <div
-        className={`bg-white rounded-2xl w-full ${widthClass} overflow-hidden flex flex-col max-h-[min(90dvh,calc(100dvh-2rem))] shadow-[0_12px_48px_-12px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06]`}
+        className={`bg-white rounded-t-2xl sm:rounded-2xl w-full ${widthClass} overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[min(90dvh,calc(100dvh-2rem))] shadow-[0_12px_48px_-12px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06]`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5 shrink-0">
           <div className="text-base font-semibold text-text-primary truncate pr-2">{title}</div>
           <button
             onClick={onClose}
-            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-black/5 rounded-md shrink-0"
+            className="p-2.5 sm:p-1.5 text-text-secondary hover:text-text-primary hover:bg-black/5 rounded-md shrink-0"
             aria-label="关闭"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
+        <div className="px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>,
     document.body,

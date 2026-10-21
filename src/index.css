@@ -423,3 +423,26 @@ html[data-theme='dark'] .border-emerald-100 { border-color: rgba(52, 211, 153, 0
     margin: 18mm 14mm;
   }
 }
+
+/* ===== 移动端基础优化 ===== */
+/* 触屏点按不出现灰色高亮块 */
+@media (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+/* iOS Safari：输入控件字号小于 16px 时聚焦会自动放大页面，统一避免 */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+/* 横滑容器隐藏滚动条（编辑器工具栏等） */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

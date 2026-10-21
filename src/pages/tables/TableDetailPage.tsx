@@ -1256,7 +1256,7 @@ function TableView({
                   {canWrite && (
                     <button
                       onClick={() => onRemoveField(f.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-secondary hover:text-red-500"
+                      className="opacity-0 group-hover:opacity-100 max-md:opacity-100 text-text-secondary hover:text-red-500"
                       title="删除字段"
                     >
                       <Trash2 size={12} />
@@ -1308,14 +1308,14 @@ function TableView({
                     <>
                       <button
                         onClick={() => onDuplicate(r)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-text-secondary hover:text-liquid-indigo hover:bg-black/5"
+                        className="opacity-0 group-hover:opacity-100 max-md:opacity-100 p-1.5 rounded-md text-text-secondary hover:text-liquid-indigo hover:bg-black/5"
                         title="复制记录"
                       >
                         <Copy size={14} />
                       </button>
                       <button
                         onClick={() => onRemove(r.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-text-secondary hover:text-red-500 hover:bg-black/5"
+                        className="opacity-0 group-hover:opacity-100 max-md:opacity-100 p-1.5 rounded-md text-text-secondary hover:text-red-500 hover:bg-black/5"
                         title="删除记录"
                       >
                         <Trash2 size={14} />

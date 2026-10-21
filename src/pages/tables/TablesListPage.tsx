@@ -194,7 +194,7 @@ export function TablesListPage() {
                 </div>
               </button>
               {tb.canManage !== false && (
-              <div className="absolute top-2 right-2 hidden group-hover:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
+              <div className="absolute top-2 right-2 hidden group-hover:flex max-md:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

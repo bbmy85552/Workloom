@@ -181,7 +181,7 @@ export function ProfilePage() {
                 </button>
                 <button
                   onClick={() => removeAvatar(a.id)}
-                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-white/90 rounded-md p-1 text-text-secondary hover:text-red-500 shadow-sm"
+                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 max-md:opacity-100 bg-white/90 rounded-md p-1 text-text-secondary hover:text-red-500 shadow-sm"
                   title="删除"
                 >
                   <Trash2 size={12} />

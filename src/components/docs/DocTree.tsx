@@ -181,7 +181,7 @@ export function DocTree({
             <span className="truncate">{node.title}</span>
           </button>
           {(manageable || editable) && (
-            <div className="hidden group-hover:flex items-center gap-0.5">
+            <div className="hidden group-hover:flex max-md:flex items-center gap-0.5">
               {onCreateChild && (
                 <button
                   type="button"

@@ -574,9 +574,22 @@ export function DocsListPage() {
               const currentFolderId = tab === 'public' ? publicFolderId : mineFolderId;
               setCreateOpen({ mode: 'create', parentId: currentFolderId });
             }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-liquid-indigo text-white text-sm font-medium hover:bg-primary transition-colors shadow-md shadow-liquid-indigo/20"
+            className="max-md:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl bg-liquid-indigo text-white text-sm font-medium hover:bg-primary transition-colors shadow-md shadow-liquid-indigo/20"
           >
             <Plus size={16} /> 新建文档
+          </button>
+          <button
+            onClick={() => {
+              setCreateKind(tab === 'public' ? 'PUBLIC' : 'PRIVATE');
+              setCreateTitle('未命名文档');
+              setImportFailures([]);
+              const currentFolderId = tab === 'public' ? publicFolderId : mineFolderId;
+              setCreateOpen({ mode: 'create', parentId: currentFolderId });
+            }}
+            className="md:hidden fixed right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 w-14 h-14 rounded-full bg-liquid-indigo text-white shadow-lg shadow-liquid-indigo/30 flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="新建文档"
+          >
+            <Plus size={26} />
           </button>
         </div>
       </header>
@@ -836,7 +849,7 @@ export function DocsListPage() {
               </button>
                 );
               })()}
-              <div className="absolute top-2 right-2 hidden group-hover:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
+              <div className="absolute top-2 right-2 hidden group-hover:flex max-md:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

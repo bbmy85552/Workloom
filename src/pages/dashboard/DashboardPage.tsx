@@ -392,7 +392,7 @@ function TodoList({
             </div>
             <button
               onClick={() => onRemove(todo.id)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg text-text-secondary hover:bg-black/5 hover:text-red-500"
+              className="opacity-0 group-hover:opacity-100 max-md:opacity-100 transition-opacity p-2 rounded-lg text-text-secondary hover:bg-black/5 hover:text-red-500"
               aria-label="删除"
             >
               <Trash2 size={16} />

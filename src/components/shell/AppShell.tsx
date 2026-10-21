@@ -43,7 +43,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-surface">
+    <div className="flex h-dvh w-screen overflow-hidden bg-surface">
       <div className="hidden md:flex">
         <Sidebar />
       </div>
@@ -55,7 +55,7 @@ export function AppShell() {
             onClick={() => setSidebar(false)}
             aria-hidden
           />
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-surface-container-lowest shadow-xl animate-fade-in-up">
+          <div className="absolute left-0 top-0 bottom-0 w-64 bg-surface-container-lowest shadow-xl animate-fade-in-up pb-[env(safe-area-inset-bottom)]">
             <Sidebar collapsedOverride={false} />
           </div>
         </div>

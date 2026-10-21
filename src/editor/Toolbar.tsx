@@ -163,7 +163,7 @@ export function EditorToolbar({ editor, fontFamilies, handlers }: ToolbarProps) 
 
   return (
     <div className="editor-toolbar no-print sticky top-0 z-10 -mx-4 sm:-mx-6 lg:-mx-12 px-4 sm:px-6 lg:px-12 pt-2 pb-2 bg-paper-white/95 backdrop-blur border-b border-black/5">
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex items-center gap-1 flex-nowrap overflow-x-auto scrollbar-none md:flex-wrap md:overflow-x-visible">
         <ToolButton title="撤销" onClick={() => editor.chain().focus().undo().run()}>
           <Undo size={16} />
         </ToolButton>

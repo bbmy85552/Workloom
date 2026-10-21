@@ -26,7 +26,7 @@ export function Header() {
       <div className="flex items-center gap-3">
         <button
           onClick={toggle}
-          className="md:hidden p-2 -ml-2 text-text-secondary hover:bg-black/5 rounded-full transition-colors"
+          className="md:hidden p-2.5 -ml-2 text-text-secondary hover:bg-black/5 rounded-full transition-colors"
           aria-label="打开菜单"
         >
           <Menu size={20} />

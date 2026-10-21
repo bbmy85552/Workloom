@@ -608,7 +608,7 @@ export function DocDetailPage() {
           onClick={backToList}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-liquid-indigo transition-colors"
         >
-          <ChevronLeft size={16} /> 返回文档列表
+          <ChevronLeft size={16} /><span className="hidden sm:inline">返回文档列表</span>
         </button>
         <div className="flex items-center gap-2 flex-wrap">
           {doc && me && (
