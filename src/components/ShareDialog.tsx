@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Link2, Trash2 } from 'lucide-react';
+import { Copy, Eye, Link2, Trash2 } from 'lucide-react';
 import { api, asApiError } from '../lib/api';
 import { useUiStore } from '../store/ui';
 import { Modal } from './Modal';
+import { ShareViewsModal } from './ShareViewsModal';
 import { Avatar, UserPicker } from './UserPicker';
 import type { Collaborator, ShareLink, UserSearchItem } from '../lib/types';
 
@@ -41,6 +42,8 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [linkRole, setLinkRole] = useState<'view' | 'edit'>('view');
+  const [linkTrack, setLinkTrack] = useState(false);
+  const [viewsLink, setViewsLink] = useState<ShareLink | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -113,6 +116,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
         resourceType,
         resourceId,
         role: linkRole,
+        trackViews: linkTrack,
       });
       setLinks((arr) => [data.link, ...arr]);
       showToast('已生成新链接', 'success');
@@ -264,6 +268,15 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
               </button>
             </div>
           </div>
+          <label className="flex items-center gap-2 mb-2 text-xs text-text-secondary cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={linkTrack}
+              onChange={(e) => setLinkTrack(e.target.checked)}
+              className="accent-liquid-indigo"
+            />
+            记录观看情况（开启后需登录才能打开，并记录每位观看者的停留、滚动与阅读情况）
+          </label>
           {links.length === 0 ? (
             <div className="text-xs text-text-secondary py-2">还没有分享链接</div>
           ) : (
@@ -279,6 +292,15 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                         {new Date(l.createdAt).toLocaleString()}
                       </div>
                     </div>
+                    {l.trackViews && (
+                      <button
+                        onClick={() => setViewsLink(l)}
+                        className="p-1.5 text-text-secondary hover:text-liquid-indigo"
+                        title="观看记录"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
                     <button
                       onClick={() => copyLink(l.token)}
                       className="p-1.5 text-text-secondary hover:text-liquid-indigo"
@@ -300,6 +322,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
           )}
         </section>
       )}
+      {viewsLink && <ShareViewsModal link={viewsLink} onClose={() => setViewsLink(null)} />}
     </Modal>
   );
 }

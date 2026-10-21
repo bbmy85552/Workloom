@@ -6,6 +6,33 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { computeAccess } from '../lib/docAccess.js';
+import { env } from '../env.js';
+import { verifyToken } from '../lib/jwt.js';
+import { findActiveSessionByToken } from '../lib/session.js';
+import type { Request } from 'express';
+
+// 尝试从 Cookie/Bearer 解析当前登录用户（不抛错）；供公开分享接口按需识别观看者。
+async function optionalUser(req: Request) {
+  const cookieToken = (req.cookies as Record<string, string> | undefined)?.[env.COOKIE_NAME];
+  const auth = req.headers.authorization;
+  const token = cookieToken || (auth?.startsWith('Bearer ') ? auth.slice(7) : undefined);
+  if (!token) return null;
+  try {
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, role: true, status: true },
+    });
+    if (!user || user.status === 'DISABLED') return null;
+    if (payload.sid) {
+      const session = await findActiveSessionByToken(token);
+      if (!session || session.userId !== user.id) return null;
+    }
+    return user;
+  } catch {
+    return null;
+  }
+}
 
 export const shareRouter = Router();
 
@@ -57,6 +84,19 @@ shareRouter.get(
     const link = await prisma.shareLink.findUnique({ where: { token: req.params.token } });
     if (!link || link.revokedAt) throw new HttpError(404, '分享链接无效或已被撤销', 'NOT_FOUND');
     if (link.expiresAt && link.expiresAt < new Date()) throw new HttpError(410, '分享链接已过期', 'EXPIRED');
+    if (link.trackViews) {
+      const viewer = await optionalUser(req);
+      if (!viewer) {
+        res.json({
+          resourceType: link.resourceType,
+          role: link.role,
+          requireLogin: true,
+          trackViews: true,
+          loginRequired: true,
+        });
+        return;
+      }
+    }
 
     if (link.resourceType === 'doc') {
       const doc = await prisma.document.findUnique({
@@ -70,7 +110,7 @@ shareRouter.get(
         },
       });
       if (!doc) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
-      res.json({ resourceType: 'doc', role: link.role, requireLogin: link.requireLogin, doc });
+      res.json({ resourceType: 'doc', role: link.role, requireLogin: link.requireLogin, trackViews: link.trackViews, doc });
       return;
     }
     if (link.resourceType === 'table') {
@@ -91,6 +131,7 @@ shareRouter.get(
         resourceType: 'table',
         role: link.role,
         requireLogin: link.requireLogin,
+        trackViews: link.trackViews,
         table: tb,
         fields: fields.map((f) => ({ ...f, options: JSON.parse(f.options || '{}') })),
         records: records.map((r) => ({ ...r, data: JSON.parse(r.dataJson || '{}') })),
@@ -123,6 +164,7 @@ shareRouter.post(
         resourceId: z.string(),
         role: z.enum(['view', 'edit']).default('view'),
         requireLogin: z.boolean().default(false),
+        trackViews: z.boolean().default(false),
         expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
       })
       .parse(req.body);
@@ -140,7 +182,8 @@ shareRouter.post(
         resourceType: body.resourceType,
         resourceId: body.resourceId,
         role: body.role,
-        requireLogin: body.requireLogin,
+        requireLogin: body.requireLogin || body.trackViews,
+        trackViews: body.trackViews,
         expiresAt,
         createdById: req.user!.id,
       },
@@ -242,5 +285,121 @@ shareRouter.post(
       return;
     }
     throw new HttpError(400, '资源类型不支持', 'BAD_TYPE');
+  }),
+);
+
+// ===== 观看记录：开启 trackViews 的链接，观看者登录后在分享页上报阅读数据 =====
+const viewHeartbeatSchema = z.object({
+  visibleSec: z.number().int().min(0).max(7 * 24 * 3600),
+  activeSec: z.number().int().min(0).max(7 * 24 * 3600),
+  scrollSec: z.number().int().min(0).max(7 * 24 * 3600),
+  maxScrollDepth: z.number().int().min(0).max(100),
+  ended: z.boolean().default(false),
+});
+
+shareRouter.post(
+  '/:token/view',
+  asyncHandler(async (req, res) => {
+    const link = await prisma.shareLink.findUnique({ where: { token: req.params.token } });
+    if (!link || link.revokedAt) throw new HttpError(404, '分享链接无效或已被撤销', 'NOT_FOUND');
+    if (link.expiresAt && link.expiresAt < new Date()) throw new HttpError(410, '分享链接已过期', 'EXPIRED');
+    if (!link.trackViews) throw new HttpError(400, '该链接未开启观看记录', 'TRACK_OFF');
+    const session = await prisma.shareViewSession.create({
+      data: {
+        linkId: link.id,
+        userId: req.user!.id,
+        userAgent: (req.headers['user-agent'] || '').slice(0, 200) || null,
+      },
+    });
+    res.json({ session: { id: session.id } });
+  }),
+);
+
+shareRouter.post(
+  '/:token/view/:sessionId',
+  asyncHandler(async (req, res) => {
+    const body = viewHeartbeatSchema.parse(req.body);
+    const session = await prisma.shareViewSession.findUnique({ where: { id: req.params.sessionId } });
+    if (!session || session.userId !== req.user!.id) {
+      throw new HttpError(404, '观看会话不存在', 'NOT_FOUND');
+    }
+    const link = await prisma.shareLink.findUnique({ where: { id: session.linkId } });
+    if (!link || link.token !== req.params.token) {
+      throw new HttpError(404, '观看会话不存在', 'NOT_FOUND');
+    }
+    await prisma.shareViewSession.update({
+      where: { id: session.id },
+      data: {
+        visibleSec: Math.max(session.visibleSec, body.visibleSec),
+        activeSec: Math.max(session.activeSec, body.activeSec),
+        scrollSec: Math.max(session.scrollSec, body.scrollSec),
+        maxScrollDepth: Math.max(session.maxScrollDepth, body.maxScrollDepth),
+        lastSeenAt: new Date(),
+        endedAt: body.ended ? new Date() : null,
+      },
+    });
+    res.json({ ok: true });
+  }),
+);
+
+shareRouter.get(
+  '/views/:linkId',
+  asyncHandler(async (req, res) => {
+    const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    const me = req.user!;
+    if (link.createdById !== me.id && me.role !== 'ADMIN') {
+      const resource = await loadResource(link.resourceType, link.resourceId);
+      if (isOwnerOrEditor(me.id, resource) !== 'owner') {
+        throw new HttpError(403, '无权查看观看记录', 'FORBIDDEN');
+      }
+    }
+    const sessions = await prisma.shareViewSession.findMany({
+      where: { linkId: link.id },
+      orderBy: { startedAt: 'desc' },
+      take: 300,
+      include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+    });
+    type Agg = {
+      user: (typeof sessions)[number]['user'];
+      visits: number;
+      visibleSec: number;
+      activeSec: number;
+      scrollSec: number;
+      maxScrollDepth: number;
+      lastSeenAt: Date;
+    };
+    const byUserMap = new Map<string, Agg>();
+    for (const s of sessions) {
+      const cur = byUserMap.get(s.userId);
+      if (!cur) {
+        byUserMap.set(s.userId, {
+          user: s.user,
+          visits: 1,
+          visibleSec: s.visibleSec,
+          activeSec: s.activeSec,
+          scrollSec: s.scrollSec,
+          maxScrollDepth: s.maxScrollDepth,
+          lastSeenAt: s.lastSeenAt,
+        });
+      } else {
+        cur.visits += 1;
+        cur.visibleSec += s.visibleSec;
+        cur.activeSec += s.activeSec;
+        cur.scrollSec += s.scrollSec;
+        cur.maxScrollDepth = Math.max(cur.maxScrollDepth, s.maxScrollDepth);
+        if (s.lastSeenAt > cur.lastSeenAt) cur.lastSeenAt = s.lastSeenAt;
+      }
+    }
+    const byUser = [...byUserMap.values()].sort((a, b) => b.activeSec - a.activeSec);
+    const avgActiveSec = sessions.length
+      ? Math.round(sessions.reduce((sum, s) => sum + s.activeSec, 0) / sessions.length)
+      : 0;
+    res.json({
+      link: { id: link.id, trackViews: link.trackViews, role: link.role, createdAt: link.createdAt },
+      summary: { viewers: byUser.length, visits: sessions.length, avgActiveSec },
+      byUser,
+      sessions,
+    });
   }),
 );

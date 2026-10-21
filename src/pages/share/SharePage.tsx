@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { FileText, Table as TableIcon, ExternalLink, LogIn, UserPlus } from 'lucide-react';
 import { api, asApiError } from '../../lib/api';
+import { startShareTracking } from '../../lib/shareTracker';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
 import { RichEditor } from '../../editor/Editor';
@@ -14,6 +15,8 @@ interface SharePayload {
   resourceType: 'doc' | 'table';
   role: 'view' | 'edit';
   requireLogin: boolean;
+  trackViews?: boolean;
+  loginRequired?: boolean;
   doc?: {
     id: string;
     title: string;
@@ -54,6 +57,19 @@ export function SharePage() {
       }
     })();
   }, [token]);
+
+  const trackingRef = useRef(false);
+  useEffect(() => {
+    if (!token || !data?.trackViews || data.loginRequired) return;
+    if (!data.doc && !data.table) return;
+    if (trackingRef.current) return;
+    trackingRef.current = true;
+    const stop = startShareTracking(token);
+    return () => {
+      stop();
+      trackingRef.current = false;
+    };
+  }, [token, data]);
 
   const claim = async () => {
     try {
@@ -131,6 +147,20 @@ export function SharePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-8 py-6">
+        {data.loginRequired && (
+          <div className="max-w-md mx-auto text-center py-16">
+            <div className="text-base font-semibold text-text-primary mb-2">该分享需要登录后查看</div>
+            <p className="text-sm text-text-secondary mb-5">
+              这条分享链接开启了观看记录：登录后即可查看内容，分享者可以看到你的停留与阅读情况。
+            </p>
+            <Link
+              to={`/login?next=${encodeURIComponent(`/share/${token}`)}`}
+              className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-liquid-indigo text-white text-sm hover:bg-primary"
+            >
+              <LogIn size={14} /> 登录后查看
+            </Link>
+          </div>
+        )}
         {data.resourceType === 'doc' && data.doc && (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
             <div className="bg-white border border-black/5 rounded-2xl shadow-sm p-6 sm:p-10">

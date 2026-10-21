@@ -290,6 +290,7 @@ export interface ShareLink {
   resourceId: string;
   role: 'view' | 'edit';
   requireLogin: boolean;
+  trackViews: boolean;
   expiresAt: string | null;
   createdAt: string;
   revokedAt: string | null;

@@ -31,6 +31,7 @@ model User {
   attachments     Attachment[]
   avatarHistory   UserAvatar[]
   shareLinks      ShareLink[] @relation("ShareLinkCreator")
+  shareViewSessions ShareViewSession[] @relation("ShareViewUser")
   documentVersions DocumentVersion[] @relation("DocVersionAuthor")
   documentComments DocumentComment[] @relation("DocCommentAuthor")
   presence        ResourcePresence[]
@@ -285,13 +286,34 @@ model ShareLink {
   resourceId    String
   role          String    @default("view")
   requireLogin  Boolean   @default(false)
+  trackViews    Boolean   @default(false)
   expiresAt     DateTime?
   createdById   String
   createdBy     User      @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  views         ShareViewSession[]
   revokedAt     DateTime?
   createdAt     DateTime  @default(now())
 
   @@index([resourceType, resourceId])
+}
+
+model ShareViewSession {
+  id             String    @id @default(cuid())
+  linkId         String
+  link           ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation("ShareViewUser", fields: [userId], references: [id], onDelete: Cascade)
+  visibleSec     Int       @default(0)
+  activeSec      Int       @default(0)
+  scrollSec      Int       @default(0)
+  maxScrollDepth Int       @default(0)
+  userAgent      String?
+  startedAt      DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  endedAt        DateTime?
+
+  @@index([linkId, startedAt])
+  @@index([userId])
 }
 
 model DocumentVersion {
