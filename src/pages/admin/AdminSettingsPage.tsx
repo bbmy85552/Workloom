@@ -65,7 +65,7 @@ export function AdminSettingsPage() {
 
   const exportBackup = async () => {
     try {
-      await downloadFromApi('/admin/backup', 'jianji-backup.json');
+      await downloadFromApi('/admin/backup', 'workloom-backup.json');
       showToast('备份已开始下载', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -74,7 +74,7 @@ export function AdminSettingsPage() {
 
   const exportMigration = async () => {
     try {
-      await downloadFromApi('/admin/migration', 'jianji-migration.json');
+      await downloadFromApi('/admin/migration', 'workloom-migration.json');
       showToast('完整迁移包已开始下载', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');

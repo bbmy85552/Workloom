@@ -74,7 +74,7 @@ export function CliPage() {
   const memoryCursorConfig = JSON.stringify(
     {
       mcpServers: {
-        'jianji-memory': {
+        'workloom-memory': {
           url: MEMORY_MCP_URL,
           headers: { Authorization: `Bearer ${activeKey}` },
         },
@@ -87,7 +87,7 @@ export function CliPage() {
   const memoryClaudeDesktopConfig = JSON.stringify(
     {
       mcpServers: {
-        'jianji-memory': {
+        'workloom-memory': {
           command: 'npx',
           args: ['-y', 'mcp-remote', MEMORY_MCP_URL, '--header', 'Authorization:${JIANJI_AUTH}'],
           env: { JIANJI_AUTH: `Bearer ${activeKey}` },
@@ -98,10 +98,10 @@ export function CliPage() {
     2,
   );
 
-  const memoryClaudeCode = `claude mcp add --transport http jianji-memory ${MEMORY_MCP_URL} \\
+  const memoryClaudeCode = `claude mcp add --transport http workloom-memory ${MEMORY_MCP_URL} \\
   --header "Authorization: Bearer ${activeKey}"`;
 
-  const memoryPrompt = `开始任何项目相关工作前，先调用 jianji-memory 的 memory_projects_list 找到项目，再调用 memory_get 读取全部置顶记忆并遵循。
+  const memoryPrompt = `开始任何项目相关工作前，先调用 workloom-memory 的 memory_projects_list 找到项目，再调用 memory_get 读取全部置顶记忆并遵循。
 工作中确定了新的事实、决策或我的偏好时，用 memory_add 记录；发现记忆过时用 memory_update / memory_delete 修正。不要记录密码或密钥。`;
 
   const curlExample = `curl ${MCP_URL} \\

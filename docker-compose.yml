@@ -1,10 +1,10 @@
 services:
-  jianji:
+  workloom:
     build:
       context: .
       dockerfile: Dockerfile
-    image: jianji:latest
-    container_name: jianji
+    image: workloom:latest
+    container_name: workloom
     restart: unless-stopped
     ports:
       - "4000:4000"
@@ -15,7 +15,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-file:/app/data/dev.db}
       JWT_SECRET: ${JWT_SECRET:?please set JWT_SECRET to a long random value}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      COOKIE_NAME: ${COOKIE_NAME:-jianji_session}
+      COOKIE_NAME: ${COOKIE_NAME:-workloom_session}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SETUP_TOKEN: ${SETUP_TOKEN:?please set SETUP_TOKEN}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
@@ -38,9 +38,11 @@ services:
       JIANJI_UPDATE_CHECK_URL: ${JIANJI_UPDATE_CHECK_URL:-https://api.github.com/repos/staklab/jianji/commits/main}
       JIANJI_UPDATE_COMMAND: ${JIANJI_UPDATE_COMMAND:-}
     volumes:
-      - jianji-data:/app/data
-      - jianji-uploads:/app/uploads
+      - workloom-data:/app/data
+      - workloom-uploads:/app/uploads
 
 volumes:
-  jianji-data:
-  jianji-uploads:
+  workloom-data:
+    name: workloom-data
+  workloom-uploads:
+    name: workloom-uploads

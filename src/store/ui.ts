@@ -60,7 +60,7 @@ interface UiState {
   resolveDialog: (id: number, result: { ok: boolean; value?: string }) => void;
 }
 
-const SIDEBAR_KEY = 'jianji.sidebarCollapsed';
+const SIDEBAR_KEY = 'workloom.sidebarCollapsed';
 const initialCollapsed =
   typeof window !== 'undefined' && window.localStorage?.getItem(SIDEBAR_KEY) === '1';
 

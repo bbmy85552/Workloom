@@ -204,7 +204,7 @@ export function MemoryListPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) void submitCreate();
               }}
-              placeholder="例如：官网改版、jianji 开发"
+              placeholder="例如：官网改版、Workloom 开发"
               className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-sm outline-none focus:border-liquid-indigo focus:ring-2 focus:ring-liquid-indigo/15"
             />
           </label>

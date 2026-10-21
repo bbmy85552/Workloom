@@ -2,10 +2,10 @@ import type { UserPreferences } from './types';
 
 export type LanguagePreference = UserPreferences['language'];
 
-const LANGUAGE_KEY = 'jianji.language';
+const LANGUAGE_KEY = 'workloom.language';
 
 const exactEn: Record<string, string> = {
-  简记: 'Document Center',
+  Workloom: 'Workloom',
   文档中心: 'Workspace',
   工作台: 'Dashboard',
   知识库: 'Docs',
@@ -313,7 +313,7 @@ const exactEn: Record<string, string> = {
   今天是: 'Today is',
   '今天是 ': 'Today is ',
   '，把重要的事情先完成吧。': ". Let's finish the important things first.",
-  简记用户: 'Document Center User',
+  Workloom用户: 'Workloom User',
   '今日还没有待办，添加一项开始吧': 'No todos today. Add one to get started.',
   今日进度: "Today's Progress",
   添加待办: 'Add Todo',
@@ -531,15 +531,15 @@ const exactEn: Record<string, string> = {
   显示名称: 'Display Name',
   管理员邮箱: 'Admin Email',
   管理员密码: 'Admin Password',
-  首次配置简记: 'First-time Document Center Setup',
+  首次配置Workloom: 'First-time Workloom Setup',
   需要初始化密钥: 'Setup Token Required',
   正在检查初始化状态: 'Checking setup status',
   '正在检查初始化状态…': 'Checking setup status...',
   完成配置: 'Complete Setup',
   页面走丢了: 'Page not found.',
   '页面走丢了。': 'Page not found.',
-  '登录简记，开始你的工作': 'Log in to the document center and start your work',
-  '登录简记，开始你的工作。': 'Log in to the document center and start your work.',
+  '登录Workloom，开始你的工作': 'Log in to Workloom and start your work',
+  '登录Workloom，开始你的工作。': 'Log in to Workloom and start your work.',
   还没有账号: 'No account yet',
   '还没有账号？': 'No account yet?',
   忘记密码: 'Forgot password',
@@ -623,7 +623,7 @@ const exactEn: Record<string, string> = {
   加入协作: 'Join Collaboration',
   已加入协作: 'Joined collaboration',
   无法打开分享内容: 'Cannot open shared content',
-  '简记 · 公开表单': 'Document Center · Public Form',
+  'Workloom · 公开表单': 'Workloom · Public Form',
   由表单创建者邀请你填写: 'Invited by the form creator',
   '提交成功，感谢你的反馈': 'Submitted successfully. Thank you for your feedback',
   '提交成功，感谢你的反馈！': 'Submitted successfully. Thank you for your feedback!',
@@ -696,7 +696,7 @@ const exactEn: Record<string, string> = {
   "私人": "Private",
   "条记忆": "memories",
   "项目名称": "Project Name",
-  "例如：官网改版、jianji 开发": "e.g. Website redesign, jianji development",
+  "例如：官网改版、Workloom 开发": "e.g. Website redesign, Workloom development",
   "项目背景、目标，AI 读取记忆时会一并看到": "Project background and goals — AI sees this when reading the memory",
   "可见范围": "Visibility",
   "仅自己和邀请的协作者": "Only you and invited collaborators",
@@ -967,7 +967,8 @@ function scheduleApply(root: Node = document.body) {
 
 export function installI18nDomTranslator() {
   if (typeof window === 'undefined' || observer) return;
-  const stored = window.localStorage.getItem(LANGUAGE_KEY) as LanguagePreference | null;
+  const stored = (window.localStorage.getItem(LANGUAGE_KEY) ??
+    window.localStorage.getItem('jianji.language')) as LanguagePreference | null;
   if (stored === 'en' || stored === 'zh-CN') {
     document.documentElement.dataset.language = stored;
     document.documentElement.lang = stored;

@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'jianji.rememberedLogin.v1';
+const STORAGE_KEY = 'workloom.rememberedLogin.v1';
+const LEGACY_STORAGE_KEY = 'jianji.rememberedLogin.v1'; // 改名前的旧键，仅作读取迁移
 
 export interface RememberedLogin {
   email: string;
@@ -25,7 +26,8 @@ function decode(value: string): RememberedLogin | null {
 
 export function readRememberedLogin(): RememberedLogin | null {
   if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  const raw =
+    window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
   return raw ? decode(raw) : null;
 }
 
