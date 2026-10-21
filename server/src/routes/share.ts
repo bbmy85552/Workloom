@@ -5,6 +5,7 @@ import { prisma } from '../prisma.js';
 import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
+import { computeAccess } from '../lib/docAccess.js';
 
 export const shareRouter = Router();
 
@@ -100,6 +101,17 @@ shareRouter.get(
   }),
 );
 
+// 公共知识库文档默认人人可编辑（见 docAccess 的 publicDefaultWrite），分享链接同步开放：
+// 在公共文档上有写权限的人也可创建分享链接；被作者明确设为「仅查看」的人不行。
+function canSharePublicDoc(
+  user: { id: string; role: string },
+  res: Awaited<ReturnType<typeof loadResource>>,
+): boolean {
+  if (res.kind !== 'doc') return false;
+  const access = computeAccess(user, res.doc, { publicDefaultWrite: true });
+  return access.isPublic && access.canWrite;
+}
+
 shareRouter.use(requireAuth, requireEmailVerified);
 
 shareRouter.post(
@@ -116,7 +128,9 @@ shareRouter.post(
       .parse(req.body);
     const resource = await loadResource(body.resourceType, body.resourceId);
     const ownership = isOwnerOrEditor(req.user!.id, resource);
-    if (ownership !== 'owner') throw new HttpError(403, '只有所有者可以创建分享链接', 'FORBIDDEN');
+    if (ownership !== 'owner' && !canSharePublicDoc(req.user!, resource)) {
+      throw new HttpError(403, '只有所有者可以创建分享链接', 'FORBIDDEN');
+    }
     const expiresAt = body.expiresInDays
       ? new Date(Date.now() + body.expiresInDays * 86400_000)
       : null;
@@ -146,12 +160,15 @@ shareRouter.get(
       .parse(req.query);
     const resource = await loadResource(q.resourceType, q.resourceId);
     const ownership = isOwnerOrEditor(req.user!.id, resource);
-    if (!ownership) throw new HttpError(403, '无权查看', 'FORBIDDEN');
+    // 公共文档的普通编辑者经分享开放规则进来时，只看自己创建的链接
+    const viaPublic = !ownership && canSharePublicDoc(req.user!, resource);
+    if (!ownership && !viaPublic) throw new HttpError(403, '无权查看', 'FORBIDDEN');
     const list = await prisma.shareLink.findMany({
       where: {
         resourceType: q.resourceType,
         resourceId: q.resourceId,
         revokedAt: null,
+        ...(viaPublic ? { createdById: req.user!.id } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

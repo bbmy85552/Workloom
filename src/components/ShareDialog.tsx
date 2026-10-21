@@ -12,6 +12,7 @@ interface ShareDialogProps {
   resourceType: 'doc' | 'table' | 'memory';
   resourceId: string;
   canManage: boolean;
+  canShareLinks?: boolean;
   resourceTitle?: string;
 }
 
@@ -27,7 +28,9 @@ const RESOURCE_LABEL: Record<ShareDialogProps['resourceType'], string> = {
   memory: '项目记忆',
 };
 
-export function ShareDialog({ open, onClose, resourceType, resourceId, canManage, resourceTitle }: ShareDialogProps) {
+export function ShareDialog({ open, onClose, resourceType, resourceId, canManage, canShareLinks, resourceTitle }: ShareDialogProps) {
+  // 链接分享可单独授权（公共文档的普通编辑者）：只开链接区，协作者管理仍归 canManage
+  const canShare = canShareLinks ?? canManage;
   // 项目记忆只支持协作者，不支持公开分享链接
   const supportsLinks = resourceType !== 'memory';
   const showToast = useUiStore((s) => s.showToast);
@@ -45,7 +48,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
       const collabPath = collaboratorBase(resourceType, resourceId);
       const [collabRes, linksRes] = await Promise.all([
         api.get<{ owner: UserSearchItem; collaborators: Collaborator[] }>(collabPath),
-        canManage && supportsLinks
+        canShare && supportsLinks
           ? api.get<{ list: ShareLink[] }>('/share', { params: { resourceType, resourceId } })
           : Promise.resolve({ data: { list: [] } }),
       ]);
@@ -57,7 +60,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
     } finally {
       setLoading(false);
     }
-  }, [canManage, resourceId, resourceType, showToast, supportsLinks]);
+  }, [canShare, resourceId, resourceType, showToast, supportsLinks]);
 
   useEffect(() => {
     if (open) void loadAll();
@@ -238,7 +241,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
         )}
       </section>
 
-      {canManage && supportsLinks && (
+      {canShare && supportsLinks && (
         <section>
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">

@@ -867,6 +867,7 @@ export function DocDetailPage() {
             resourceId={doc.id}
             resourceTitle={title}
             canManage={canInvite}
+            canShareLinks={canInvite || (access.isPublic && canWrite)}
           />
           <VersionDrawer
             open={versionOpen}
