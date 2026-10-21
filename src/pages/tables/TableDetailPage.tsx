@@ -310,7 +310,7 @@ export function TableDetailPage() {
           onClick={() => navigate('/app/tables')}
           className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-liquid-indigo"
         >
-          <ChevronLeft size={16} /> 返回数据表列表
+          <ChevronLeft size={16} /><span className="hidden sm:inline">返回数据表列表</span>
         </button>
       </div>
 

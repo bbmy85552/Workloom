@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  ChevronLeft,
   Mail,
   Plus,
   RefreshCw,
@@ -544,6 +545,23 @@ export function MailPage() {
           <p className="text-sm text-text-secondary mt-1">聚合多个邮箱账号，统一收发邮件</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {accounts.length > 1 && (
+            <select
+              value={currentId ?? ''}
+              onChange={(e) => {
+                setCurrentId(e.target.value);
+                setCurrentFolder('INBOX');
+              }}
+              className="lg:hidden text-sm px-2 py-1.5 rounded-lg border border-black/10 bg-white max-w-[45vw]"
+              aria-label="切换邮箱账号"
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={openQuick}
             className="text-sm px-3 py-1.5 rounded-lg bg-liquid-indigo text-white inline-flex items-center gap-1"
@@ -606,7 +624,7 @@ export function MailPage() {
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_minmax(0,1.4fr)] gap-4 overflow-hidden">
-        <div className="bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full">
+        <div className="bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full max-lg:hidden">
           <div className="text-xs uppercase tracking-wider text-text-secondary px-4 py-3 shrink-0 border-b border-black/5">
             已绑定账号
           </div>
@@ -683,7 +701,7 @@ export function MailPage() {
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full">
+        <div className={`bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full ${selectedMessage ? 'max-lg:hidden' : ''}`}>
           <div className="px-3 py-3 border-b border-black/5 text-xs text-text-secondary shrink-0 flex items-center justify-between gap-2">
             <span>
               {currentFolder} · {messages.length} 封
@@ -748,13 +766,21 @@ export function MailPage() {
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full">
+        <div className={`bg-surface-container-lowest border border-black/5 rounded-2xl flex flex-col min-h-0 min-w-0 overflow-hidden h-full ${selectedMessage ? '' : 'max-lg:hidden'}`}>
           {!selectedMessage ? (
             <div className="text-sm text-text-secondary py-10 text-center flex-1 flex items-center justify-center">
               选择一封邮件查看
             </div>
           ) : (
             <>
+              <div className="lg:hidden px-4 pt-3 shrink-0">
+                <button
+                  onClick={() => setSelectedMessage(null)}
+                  className="inline-flex items-center gap-1 text-sm text-text-secondary"
+                >
+                  <ChevronLeft size={16} /> 返回邮件列表
+                </button>
+              </div>
               <div className="px-4 pt-4 pb-3 shrink-0 border-b border-black/5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-xl font-semibold flex-1 min-w-0 break-words">
