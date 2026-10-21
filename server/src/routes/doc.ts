@@ -13,10 +13,96 @@ import {
 } from '../lib/upload.js';
 import { importByExtension } from '../lib/textImport.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
+import { createNotification } from '../lib/notify.js';
 import { htmlToDocx, htmlToFullPage, htmlToMarkdown } from '../lib/export.js';
 import { contentDispositionAttachment, normalizeFilename } from '../lib/filename.js';
 
 export const docRouter = Router();
+
+// ===== 我的回收站：软删除的公共文档（私人文档删除为硬删除，不进回收站）=====
+// 本人创建的、或由本人删除的文档可见；恢复时父链若也被软删则一并恢复，避免孤儿。
+docRouter.get(
+  '/trash',
+  asyncHandler(async (req, res) => {
+    const list = await prisma.document.findMany({
+      where: {
+        deletedAt: { not: null },
+        OR: [{ createdById: req.user!.id }, { deletedById: req.user!.id }],
+      },
+      orderBy: { deletedAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        title: true,
+        deletedAt: true,
+        createdById: true,
+        deletedById: true,
+        workspace: { select: { id: true, name: true, kind: true } },
+        createdBy: { select: { id: true, name: true } },
+      },
+    });
+    res.json({ list });
+  }),
+);
+
+function assertTrashMine(
+  reqUser: { id: string; role: string },
+  doc: { createdById: string; deletedById: string | null },
+) {
+  if (doc.createdById !== reqUser.id && doc.deletedById !== reqUser.id && reqUser.role !== 'ADMIN') {
+    throw new HttpError(403, '只能处理自己创建或删除的文档', 'FORBIDDEN');
+  }
+}
+
+docRouter.post(
+  '/trash/:id/restore',
+  asyncHandler(async (req, res) => {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, parentId: true, deletedAt: true, createdById: true, deletedById: true },
+    });
+    if (!doc || !doc.deletedAt) throw new HttpError(404, '回收站中无此文档', 'NOT_FOUND');
+    assertTrashMine(req.user!, doc);
+    let cursor = doc.parentId;
+    const parentChain: string[] = [];
+    const visited = new Set<string>();
+    while (cursor && !visited.has(cursor)) {
+      visited.add(cursor);
+      const parent = await prisma.document.findUnique({
+        where: { id: cursor },
+        select: { id: true, parentId: true, deletedAt: true },
+      });
+      if (!parent) break;
+      if (parent.deletedAt) parentChain.push(parent.id);
+      cursor = parent.parentId;
+    }
+    if (parentChain.length) {
+      await prisma.document.updateMany({
+        where: { id: { in: parentChain } },
+        data: { deletedAt: null, deletedById: null },
+      });
+    }
+    const restored = await prisma.document.update({
+      where: { id: doc.id },
+      data: { deletedAt: null, deletedById: null },
+    });
+    res.json({ doc: restored, restoredParents: parentChain.length });
+  }),
+);
+
+docRouter.delete(
+  '/trash/:id',
+  asyncHandler(async (req, res) => {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, deletedAt: true, createdById: true, deletedById: true },
+    });
+    if (!doc || !doc.deletedAt) throw new HttpError(404, '回收站中无此文档', 'NOT_FOUND');
+    assertTrashMine(req.user!, doc);
+    await prisma.document.delete({ where: { id: doc.id } });
+    res.json({ ok: true });
+  }),
+);
 docRouter.use(requireAuth, requireEmailVerified);
 
 const ATTACHMENT_RAW_RE = /\/api\/attachments\/([^/?#]+)\/raw/g;
@@ -642,6 +728,14 @@ docRouter.delete(
     } else {
       await prisma.document.delete({ where: { id: doc.id } });
     }
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'DELETE_DOC',
+        target: doc.id,
+        metaJson: JSON.stringify({ title: doc.title, soft: doc.workspace.kind === 'PUBLIC' }),
+      },
+    }).catch(() => undefined);
     res.json({ ok: true });
   }),
 );
@@ -798,6 +892,26 @@ docRouter.post(
       },
       include: { author: { select: commentAuthorSelect } },
     });
+    // 通知文档作者与被回复的评论作者（不通知自己）
+    const notifyTargets = new Set<string>();
+    if (doc.createdById !== req.user!.id) notifyTargets.add(doc.createdById);
+    if (body.parentId) {
+      const parent = await prisma.documentComment.findUnique({
+        where: { id: body.parentId },
+        select: { authorId: true },
+      });
+      if (parent && parent.authorId !== req.user!.id) notifyTargets.add(parent.authorId);
+    }
+    for (const targetId of notifyTargets) {
+      void createNotification({
+        userId: targetId,
+        category: 'doc_comment',
+        title: `《${doc.title}》有新评论`,
+        body: body.body.slice(0, 120),
+        link: `/app/docs/${doc.id}`,
+        meta: { docId: doc.id, commentId: comment.id },
+      }).catch(() => undefined);
+    }
     res.json({ comment });
   }),
 );
@@ -903,6 +1017,14 @@ docRouter.post(
       create: { documentId: doc.id, userId: user.id, role: body.role },
       include: { user: { select: { id: true, email: true, name: true, avatarUrl: true } } },
     });
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'DOC_COLLABORATOR_UPSERT',
+        target: doc.id,
+        metaJson: JSON.stringify({ userId: user.id, role: body.role }),
+      },
+    }).catch(() => undefined);
     res.json({ collaborator: perm });
   }),
 );
@@ -918,6 +1040,14 @@ docRouter.patch(
       data: { role: body.role },
       include: { user: { select: { id: true, email: true, name: true, avatarUrl: true } } },
     });
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'DOC_COLLABORATOR_UPDATE',
+        target: doc.id,
+        metaJson: JSON.stringify({ userId: req.params.userId, role: body.role }),
+      },
+    }).catch(() => undefined);
     res.json({ collaborator: perm });
   }),
 );
@@ -930,6 +1060,14 @@ docRouter.delete(
     await prisma.documentPermission.delete({
       where: { documentId_userId: { documentId: doc.id, userId: req.params.userId } },
     });
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'DOC_COLLABORATOR_REMOVE',
+        target: doc.id,
+        metaJson: JSON.stringify({ userId: req.params.userId }),
+      },
+    }).catch(() => undefined);
     res.json({ ok: true });
   }),
 );
@@ -951,7 +1089,7 @@ docRouter.get(
         workspaceId: q.workspaceId ? q.workspaceId : { in: wsIds },
         isArchived: false,
         deletedAt: null,
-        ...(q.q ? { title: { contains: q.q } } : {}),
+        ...(q.q ? { OR: [{ title: { contains: q.q } }, { contentJson: { contains: q.q } }] } : {}),
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,

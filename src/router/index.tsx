@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { SetupPage } from '../pages/setup/SetupPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { DocsListPage } from '../pages/docs/DocsListPage';
+import { UserTrashPage } from '../pages/docs/UserTrashPage';
 import { DocDetailPage } from '../pages/docs/DocDetailPage';
 import { TablesListPage } from '../pages/tables/TablesListPage';
 import { TableDetailPage } from '../pages/tables/TableDetailPage';
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'docs', element: <DocsListPage /> },
           { path: 'docs/:id', element: <DocDetailPage /> },
+          { path: 'docs/trash', element: <UserTrashPage /> },
           { path: 'tables', element: <TablesListPage /> },
           { path: 'tables/:id', element: <TableDetailPage /> },
           { path: 'memory', element: <MemoryListPage /> },

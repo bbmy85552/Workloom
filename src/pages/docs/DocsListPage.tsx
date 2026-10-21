@@ -516,6 +516,12 @@ export function DocsListPage() {
           <p className="text-text-secondary">私人空间用于个人沉淀；公共知识库面向所有注册用户。</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => navigate('/app/docs/trash')}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-black/10 text-sm text-text-secondary hover:bg-black/5"
+          >
+            <Trash2 size={16} /> 回收站
+          </button>
           <div className="inline-flex items-center bg-black/5 rounded-xl p-1 text-sm">
             <button
               onClick={() => setLayout('grid')}

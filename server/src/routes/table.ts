@@ -205,12 +205,16 @@ async function loadTable(userId: string, tableId: string) {
   if (!table) throw new HttpError(404, '数据表不存在', 'NOT_FOUND');
   const isOwner = table.workspace.ownerId === userId || table.createdById === userId;
   const perm = table.permissions.find((p) => p.userId === userId);
-  if (!isOwner && !perm) throw new HttpError(403, '无权限', 'FORBIDDEN');
-  return {
-    table,
-    role: isOwner ? 'OWNER' : perm!.role,
-    canWrite: isOwner || perm!.role === 'EDITOR',
-  };
+  if (isOwner) return { table, role: 'OWNER', canWrite: true };
+  // 被明确授权的人按授权走（公共空间里被设为 VIEWER 的人保持只读，与文档一致）
+  if (perm) return { table, role: perm.role, canWrite: perm.role === 'EDITOR' };
+  if (table.workspace.kind === 'PUBLIC') {
+    // 与文档的公共规则对齐：公共空间的数据表默认可读可编辑，管理员同权
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (user?.role === 'ADMIN') return { table, role: 'ADMIN', canWrite: true };
+    return { table, role: 'EDITOR', canWrite: true };
+  }
+  throw new HttpError(403, '无权限', 'FORBIDDEN');
 }
 
 function assertWrite(ctx: { canWrite: boolean }) {
@@ -253,7 +257,24 @@ tableRouter.get(
       orderBy: { updatedAt: 'desc' },
       include: { workspace: { select: { id: true, name: true } } },
     });
-    res.json({ list: ownList, sharedList });
+    // 公共空间的数据表对所有人可见（与文档的公共规则对齐），并入列表并去重
+    const publicWs = await prisma.workspace.findFirst({ where: { kind: 'PUBLIC' }, select: { id: true } });
+    const publicList = publicWs
+      ? await prisma.tableBase.findMany({
+          where: { workspaceId: publicWs.id },
+          orderBy: { updatedAt: 'desc' },
+          include: { workspace: { select: { id: true, name: true, ownerId: true } } },
+        })
+      : [];
+    const seen = new Set([...ownList.map((t) => t.id), ...sharedList.map((t) => t.id)]);
+    const extraPublic = publicList.filter((t) => !seen.has(t.id));
+    // canManage：只有所有者/空间主人/管理员能改名与删除整表，前端据此收起管理按钮
+    const annotate = (t: { createdById: string; workspace?: { ownerId?: string } | null }) => ({
+      ...t,
+      canManage:
+        req.user!.role === 'ADMIN' || t.createdById === req.user!.id || t.workspace?.ownerId === req.user!.id,
+    });
+    res.json({ list: [...ownList.map(annotate), ...extraPublic.map(annotate)], sharedList });
   }),
 );
 
@@ -398,7 +419,7 @@ tableRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const ctx = await loadTable(req.user!.id, req.params.id);
-    if (ctx.role !== 'OWNER') throw new HttpError(403, '只有所有者可以删除数据表', 'FORBIDDEN');
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') throw new HttpError(403, '只有所有者可以删除数据表', 'FORBIDDEN');
     await prisma.tableBase.delete({ where: { id: ctx.table.id } });
     res.json({ ok: true });
   }),

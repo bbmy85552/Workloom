@@ -222,6 +222,7 @@ export interface TableRecord {
 export interface TableBase {
   id: string;
   workspaceId: string;
+  canManage?: boolean;
   name: string;
   templateKey: string | null;
   updatedAt: string;

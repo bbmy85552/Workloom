@@ -145,6 +145,14 @@ shareRouter.post(
         createdById: req.user!.id,
       },
     });
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'CREATE_SHARE_LINK',
+        target: body.resourceId,
+        metaJson: JSON.stringify({ resourceType: body.resourceType, role: body.role }),
+      },
+    }).catch(() => undefined);
     res.json({ link });
   }),
 );
@@ -181,13 +189,25 @@ shareRouter.delete(
   asyncHandler(async (req, res) => {
     const link = await prisma.shareLink.findUnique({ where: { id: req.params.id } });
     if (!link) throw new HttpError(404, '分享不存在', 'NOT_FOUND');
-    if (link.createdById !== req.user!.id) {
-      throw new HttpError(403, '无权操作该分享', 'FORBIDDEN');
+    // 链接创建者、资源所有者、管理员均可撤销（作者要能管自己文章被别人建的链接）
+    if (link.createdById !== req.user!.id && req.user!.role !== 'ADMIN') {
+      const resource = await loadResource(link.resourceType, link.resourceId);
+      if (isOwnerOrEditor(req.user!.id, resource) !== 'owner') {
+        throw new HttpError(403, '无权操作该分享', 'FORBIDDEN');
+      }
     }
     await prisma.shareLink.update({
       where: { id: link.id },
       data: { revokedAt: new Date() },
     });
+    void prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'REVOKE_SHARE_LINK',
+        target: link.resourceId,
+        metaJson: JSON.stringify({ linkId: link.id }),
+      },
+    }).catch(() => undefined);
     res.json({ ok: true });
   }),
 );

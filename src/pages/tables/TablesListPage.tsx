@@ -193,6 +193,7 @@ export function TablesListPage() {
                   </div>
                 </div>
               </button>
+              {tb.canManage !== false && (
               <div className="absolute top-2 right-2 hidden group-hover:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
                 <button
                   onClick={(e) => {
@@ -215,6 +216,7 @@ export function TablesListPage() {
                   <Trash2 size={14} />
                 </button>
               </div>
+              )}
             </li>
           ))}
         </ul>
