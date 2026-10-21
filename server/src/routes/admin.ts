@@ -375,7 +375,7 @@ async function fetchLatestUpdateInfo() {
       source: env.JIANJI_UPDATE_CHECK_URL,
     };
   } catch (err) {
-    console.warn('[简记] 版本检测失败：', (err as Error).message);
+    console.warn('[Workloom] 版本检测失败：', (err as Error).message);
     return { version: '', commit: '', source: 'failed' };
   } finally {
     clearTimeout(timer);
@@ -415,7 +415,7 @@ async function broadcastMaintenanceNotification(input: {
       emails += 1;
     } catch (err) {
       emailErrors += 1;
-      console.warn('[简记] 维护通知邮件发送失败：', u.email, (err as Error).message);
+      console.warn('[Workloom] 维护通知邮件发送失败：', u.email, (err as Error).message);
     }
   }
   return { users: users.length, emails, emailErrors };
@@ -491,7 +491,7 @@ adminRouter.get(
     const payload = await createBackupPayload();
     const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', contentDispositionAttachment(`jianji-backup-${stamp}.json`));
+    res.setHeader('Content-Disposition', contentDispositionAttachment(`workloom-backup-${stamp}.json`));
     res.json(payload);
   }),
 );
@@ -502,7 +502,7 @@ adminRouter.get(
     const payload = await createMigrationPayload();
     const stamp = payload.exportedAt.slice(0, 19).replace(/[:T]/g, '-');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', contentDispositionAttachment(`jianji-migration-${stamp}.json`));
+    res.setHeader('Content-Disposition', contentDispositionAttachment(`workloom-migration-${stamp}.json`));
     res.json(payload);
   }),
 );

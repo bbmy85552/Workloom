@@ -51,7 +51,7 @@ export async function sendMail(payload: MailPayload) {
       throw new Error('未启用 SMTP，无法发送邮件验证码或通知。请配置 MAIL_ENABLED=true 和 MAIL_*。');
     }
     console.log(
-      `[简记][MAIL:TEST] 收件人=${payload.to} 主题="${payload.subject}"\n内容:\n${payload.text ?? payload.html ?? ''}`,
+      `[Workloom][MAIL:TEST] 收件人=${payload.to} 主题="${payload.subject}"\n内容:\n${payload.text ?? payload.html ?? ''}`,
     );
     return { ok: true, transport: 'log' as const };
   }

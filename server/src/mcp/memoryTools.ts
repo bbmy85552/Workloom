@@ -18,7 +18,7 @@ import {
 } from '../lib/memoryService.js';
 
 export const MEMORY_MCP_INSTRUCTIONS = [
-  'jianji 项目记忆（Project Memory）：团队与个人的项目事实、决策、偏好、笔记和待办。',
+  'Workloom 项目记忆（Project Memory）：团队与个人的项目事实、决策、偏好、笔记和待办。',
   '开始一个项目相关的任务前：先调用 memory_projects_list 找到项目，再调用 memory_get 读取全部置顶记忆，并在后续工作中遵循这些记忆。',
   '工作中产生了值得长期保留的信息（确定的事实、做出的决策、用户偏好）时，用 memory_add 写入；信息过时则用 memory_update 修改或 memory_delete 删除。',
   '不要写入密码、密钥、token 等敏感信息。',
@@ -245,7 +245,7 @@ export function registerMemoryTools(server: McpServer, user: AuthedUser) {
 /** 仅包含项目记忆工具的 MCP Server，用于 /mcp/memory。 */
 export function createMemoryMcpServer(user: AuthedUser) {
   const server = new McpServer(
-    { name: 'jianji-memory', version: '0.1.0' },
+    { name: 'workloom-memory', version: '0.1.0' },
     { instructions: MEMORY_MCP_INSTRUCTIONS },
   );
   registerMemoryTools(server, user);

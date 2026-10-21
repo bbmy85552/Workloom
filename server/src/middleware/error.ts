@@ -22,7 +22,7 @@ export function errorHandler(
       details: err.details,
     });
   }
-  console.error('[简记] 未捕获异常:', err);
+  console.error('[Workloom] 未捕获异常:', err);
   return res.status(500).json({
     error: '服务器内部错误',
     code: 'INTERNAL_ERROR',

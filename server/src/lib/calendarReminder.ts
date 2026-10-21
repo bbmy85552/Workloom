@@ -48,9 +48,9 @@ async function tick() {
 export function startCalendarReminder() {
   if (timer) return;
   // 立即跑一次，然后每 30 秒
-  void tick().catch((err) => console.warn('[简记] 提醒扫描失败:', err.message));
+  void tick().catch((err) => console.warn('[Workloom] 提醒扫描失败:', err.message));
   timer = setInterval(() => {
-    void tick().catch((err) => console.warn('[简记] 提醒扫描失败:', err.message));
+    void tick().catch((err) => console.warn('[Workloom] 提醒扫描失败:', err.message));
   }, 30_000);
   if (timer.unref) timer.unref();
 }
