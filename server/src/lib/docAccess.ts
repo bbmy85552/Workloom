@@ -41,6 +41,7 @@ export function computeAccess(
     workspace: { ownerId: string; kind: string };
     permissions: { userId: string; role: string }[];
   },
+  opts?: { publicDefaultWrite?: boolean },
 ): DocAccess {
   const isAdmin = user.role === 'ADMIN';
   const isPublic = doc.workspace.kind === 'PUBLIC';
@@ -70,6 +71,29 @@ export function computeAccess(
       };
     }
     if (perm?.role === 'EDITOR') {
+      return {
+        role: 'EDITOR',
+        canRead: true,
+        canWrite: true,
+        canDelete: false,
+        canInvite: false,
+        isPublic,
+      };
+    }
+    if (perm?.role === 'VIEWER') {
+      // 作者明确设为「仅查看」的协作者保持只读，不被下面的默认可编辑覆盖
+      return {
+        role: 'VIEWER',
+        canRead: true,
+        canWrite: false,
+        canDelete: false,
+        canInvite: false,
+        isPublic,
+      };
+    }
+    if (opts?.publicDefaultWrite) {
+      // 知识库公共文档默认人人可编辑：可改内容、可移动位置；不可删除、不可邀请协作者。
+      // 换人编辑时服务端会先把旧版存入版本历史，方便回溯。项目记忆不传此开关，不受影响。
       return {
         role: 'EDITOR',
         canRead: true,
@@ -136,7 +160,7 @@ export async function loadDocWithAccess(
   docId: string,
 ) {
   const doc = await loadDoc(docId);
-  const access = computeAccess(user, doc);
+  const access = computeAccess(user, doc, { publicDefaultWrite: true });
   if (!access.canRead) throw new HttpError(403, '无权访问该文档', 'FORBIDDEN');
   return { doc, access };
 }

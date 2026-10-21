@@ -523,6 +523,12 @@ export function DocDetailPage() {
     }
   };
 
+  // 评论管理（解决/删除）可见性，与服务端规则保持一致：评论作者本人，或有写权限者；
+  // 公共文档因人人可编辑正文，收紧为文档所有者/管理员
+  const canModerateComment = (comment: DocumentComment) =>
+    comment.authorId === me?.id ||
+    (canWrite && (!access.isPublic || access.role === 'OWNER' || access.role === 'ADMIN'));
+
   const resolveComment = async (commentId: string, resolved: boolean) => {
     if (!id) return;
     try {
@@ -937,21 +943,23 @@ export function DocDetailPage() {
                           <span>
                             {comment.author.name} · {new Date(comment.createdAt).toLocaleString('zh-CN')}
                           </span>
-                          <span className="flex items-center gap-2">
-                            <button
-                              onClick={() => resolveComment(comment.id, !comment.resolvedAt)}
-                              className="hover:text-liquid-indigo inline-flex items-center gap-1"
-                            >
-                              <CheckCircle2 size={12} />
-                              {comment.resolvedAt ? '重新打开' : '解决'}
-                            </button>
-                            <button
-                              onClick={() => deleteComment(comment.id)}
-                              className="hover:text-red-500"
-                            >
-                              删除
-                            </button>
-                          </span>
+                          {canModerateComment(comment) && (
+                            <span className="flex items-center gap-2">
+                              <button
+                                onClick={() => resolveComment(comment.id, !comment.resolvedAt)}
+                                className="hover:text-liquid-indigo inline-flex items-center gap-1"
+                              >
+                                <CheckCircle2 size={12} />
+                                {comment.resolvedAt ? '重新打开' : '解决'}
+                              </button>
+                              <button
+                                onClick={() => deleteComment(comment.id)}
+                                className="hover:text-red-500"
+                              >
+                                删除
+                              </button>
+                            </span>
+                          )}
                         </div>
                         {replies.length > 0 && (
                           <div className="mt-3 pl-3 border-l border-black/10 space-y-2">

@@ -570,9 +570,16 @@ docRouter.patch(
     // 乐观锁：force=true 跳过版本检查（用户已在冲突面板确认覆盖）；
     // 否则把 expectedUpdatedAt 加入 where，不匹配时 Prisma 抛 P2025（记录未找到）= 文档已被他人修改。
     const versionGuard = !force && expectedUpdatedAt ? { updatedAt: new Date(expectedUpdatedAt) } : {};
+    // 标题/正文确实变化才算一次编辑（纯移动位置、归档不算），据此维护最后编辑者并触发自动历史快照
+    const contentChanged =
+      (body.title !== undefined && body.title !== doc.title) ||
+      (body.contentJson !== undefined && body.contentJson !== doc.contentJson);
     let updated;
     try {
-      updated = await prisma.document.update({ where: { id: doc.id, ...versionGuard }, data: writeFields });
+      updated = await prisma.document.update({
+        where: { id: doc.id, ...versionGuard },
+        data: contentChanged ? { ...writeFields, lastEditedById: req.user!.id } : writeFields,
+      });
     } catch (e: unknown) {
       if (force || !expectedUpdatedAt) throw e;
       const code = (e as { code?: string }).code;
@@ -583,6 +590,25 @@ docRouter.patch(
         include: { workspace: true },
       });
       throw new HttpError(409, '文档已被他人修改，请先查看最新版本', 'DOC_CONFLICT', { doc: latest });
+    }
+    // 换人编辑自动留痕：这次改动之前的内容是别人写的，先把旧版存入版本历史（署名原作者），方便回溯
+    if (contentChanged) {
+      const prevAuthorId = doc.lastEditedById ?? doc.createdById;
+      if (prevAuthorId !== req.user!.id) {
+        const prevAuthor = await prisma.user.findUnique({
+          where: { id: prevAuthorId },
+          select: { id: true },
+        });
+        await prisma.documentVersion.create({
+          data: {
+            documentId: doc.id,
+            title: doc.title,
+            contentJson: doc.contentJson,
+            label: '编辑前自动快照',
+            authorId: prevAuthor ? prevAuthorId : doc.createdById,
+          },
+        });
+      }
     }
     res.json({ doc: withFolderFlag(updated) });
   }),
@@ -790,11 +816,16 @@ docRouter.patch(
         resolved: z.boolean().optional(),
       })
       .parse(req.body);
-    const canEditBody = target.authorId === req.user!.id || access.canWrite;
-    if (body.body !== undefined && !canEditBody) {
+    // 评论管理（改/解决/删）：私有文档维持「有写权限即可」；公共文档因人人可编辑正文，
+    // 收紧为评论作者本人、文档所有者或管理员，避免互相改删评论
+    const isCommentAuthor = target.authorId === req.user!.id;
+    const canModerateComment =
+      isCommentAuthor ||
+      (access.canWrite && (!access.isPublic || access.role === 'OWNER' || access.role === 'ADMIN'));
+    if (body.body !== undefined && !canModerateComment) {
       throw new HttpError(403, '只能编辑自己的评论', 'FORBIDDEN');
     }
-    if (body.resolved !== undefined && !access.canWrite && target.authorId !== req.user!.id) {
+    if (body.resolved !== undefined && !canModerateComment) {
       throw new HttpError(403, '没有处理评论的权限', 'FORBIDDEN');
     }
     const comment = await prisma.documentComment.update({
@@ -817,7 +848,11 @@ docRouter.delete(
     if (!target || target.documentId !== req.params.id) {
       throw new HttpError(404, '评论不存在', 'COMMENT_NOT_FOUND');
     }
-    if (target.authorId !== req.user!.id && !access.canWrite) {
+    const isCommentAuthor = target.authorId === req.user!.id;
+    const canModerateComment =
+      isCommentAuthor ||
+      (access.canWrite && (!access.isPublic || access.role === 'OWNER' || access.role === 'ADMIN'));
+    if (!canModerateComment) {
       throw new HttpError(403, '没有删除评论的权限', 'FORBIDDEN');
     }
     await prisma.documentComment.delete({ where: { id: target.id } });

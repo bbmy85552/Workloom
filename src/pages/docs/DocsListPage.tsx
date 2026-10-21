@@ -466,6 +466,9 @@ export function DocsListPage() {
     return false; // shared 给我看的，不允许在列表内删除
   };
 
+  // 公共知识库人人可编辑、可移动位置（删除与跨空间迁移仍走 canManage）；最终权限以服务端为准
+  const canEditCurrentTab = tab === 'mine' || tab === 'public';
+
   const openPublicFolder = (folderId: string | null) => {
     focusFolderLocation('public', folderId);
   };
@@ -478,7 +481,7 @@ export function DocsListPage() {
     ((tab === 'public' && !!user?.role) || tab === 'mine') &&
     layout === 'grid' &&
     !q &&
-    canManage(doc);
+    (canManage(doc) || canEditCurrentTab);
 
   const moveFolderOptions = useMemo(() => {
     const folders = tab === 'mine' ? mineFolders : publicFolders;
@@ -721,6 +724,7 @@ export function DocsListPage() {
           <DocTree
             tree={treeNodes}
             canManage={canManage}
+            canEdit={() => canEditCurrentTab}
             onSelect={(doc) => openDoc(doc.id)}
             onCreateChild={
               treeSupportsManage
@@ -841,7 +845,7 @@ export function DocsListPage() {
                 >
                   <Star size={14} fill={doc.isFavorite ? 'currentColor' : 'none'} />
                 </button>
-                {canManage(doc) && (
+                {(canManage(doc) || canEditCurrentTab) && (
                   <>
                     {(tab === 'public' || tab === 'mine') && (
                       <button
@@ -901,16 +905,18 @@ export function DocsListPage() {
                     >
                       <Pencil size={14} />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        remove(doc);
-                      }}
-                      className="p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-md"
-                      title="删除"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canManage(doc) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          remove(doc);
+                        }}
+                        className="p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-md"
+                        title="删除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </>
                 )}
               </div>

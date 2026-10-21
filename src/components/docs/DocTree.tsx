@@ -48,6 +48,7 @@ interface Props {
   tree: TreeNode[];
   selectedId?: string | null;
   canManage?: (doc: DocNode) => boolean;
+  canEdit?: (doc: DocNode) => boolean;
   onSelect: (doc: DocNode) => void;
   onCreateChild?: (parent: DocNode | null) => void;
   onRename?: (doc: DocNode) => void;
@@ -62,6 +63,7 @@ export function DocTree({
   tree,
   selectedId,
   canManage,
+  canEdit,
   onSelect,
   onCreateChild,
   onRename,
@@ -119,10 +121,11 @@ export function DocTree({
     const selected = selectedId === node.id;
     const dragOver = dragOverId === node.id;
     const manageable = !canManage || canManage(node);
+    const editable = !canEdit || canEdit(node);
     return (
       <li key={node.id}>
         <div
-          draggable={!!onMove && manageable}
+          draggable={!!onMove && editable}
           onDragStart={(e) => {
             e.dataTransfer.setData('text/plain', node.id);
             e.dataTransfer.effectAllowed = 'move';
@@ -177,7 +180,7 @@ export function DocTree({
             )}
             <span className="truncate">{node.title}</span>
           </button>
-          {manageable && (
+          {(manageable || editable) && (
             <div className="hidden group-hover:flex items-center gap-0.5">
               {onCreateChild && (
                 <button
@@ -206,7 +209,7 @@ export function DocTree({
                   <Pencil size={12} />
                 </button>
               )}
-              {onCopyToPublic && !node.isFolder && (
+              {manageable && onCopyToPublic && !node.isFolder && (
                 <button
                   type="button"
                   title="复制到公共知识库"
@@ -219,7 +222,7 @@ export function DocTree({
                   <Copy size={12} />
                 </button>
               )}
-              {onMoveToPublic && (
+              {manageable && onMoveToPublic && (
                 <button
                   type="button"
                   title="移动到公共知识库"
@@ -232,7 +235,7 @@ export function DocTree({
                   <FolderInput size={12} />
                 </button>
               )}
-              {onMoveToPrivate && (
+              {manageable && onMoveToPrivate && (
                 <button
                   type="button"
                   title="移到我的私密空间"
@@ -245,7 +248,7 @@ export function DocTree({
                   <FolderOutput size={12} />
                 </button>
               )}
-              {onDelete && (
+              {manageable && onDelete && (
                 <button
                   type="button"
                   title="删除"

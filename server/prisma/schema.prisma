@@ -127,6 +127,7 @@ model Document {
   createdBy     User     @relation("DocCreator", fields: [createdById], references: [id], onDelete: Cascade)
   deletedAt     DateTime?
   deletedById   String?
+  lastEditedById String?
   deletedBy     User?     @relation("DeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
   permissions   DocumentPermission[]
   versions      DocumentVersion[]

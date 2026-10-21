@@ -30,7 +30,7 @@ async function assertCanWriteResource(
     });
     if (!doc) throw new HttpError(404, '关联文档不存在', 'DOC_NOT_FOUND');
     const { computeAccess } = await import('../lib/docAccess.js');
-    const access = computeAccess(user, doc);
+    const access = computeAccess(user, doc, { publicDefaultWrite: true });
     if (!access.canWrite) throw new HttpError(403, '没有写权限', 'FORBIDDEN');
   }
   if (tableId) {
