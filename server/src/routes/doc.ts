@@ -19,6 +19,8 @@ import { contentDispositionAttachment, normalizeFilename } from '../lib/filename
 
 export const docRouter = Router();
 
+docRouter.use(requireAuth, requireEmailVerified);
+
 // ===== 我的回收站：软删除的公共文档（私人文档删除为硬删除，不进回收站）=====
 // 本人创建的、或由本人删除的文档可见；恢复时父链若也被软删则一并恢复，避免孤儿。
 docRouter.get(
@@ -103,7 +105,7 @@ docRouter.delete(
     res.json({ ok: true });
   }),
 );
-docRouter.use(requireAuth, requireEmailVerified);
+
 
 const ATTACHMENT_RAW_RE = /\/api\/attachments\/([^/?#]+)\/raw/g;
 const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
