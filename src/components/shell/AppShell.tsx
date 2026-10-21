@@ -3,7 +3,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Toast } from './Toast';
-import { MobileTabBar } from './MobileTabBar';
 import { useUiStore } from '../../store/ui';
 import { api } from '../../lib/api';
 import type { UserPreferences } from '../../lib/types';
@@ -66,7 +65,7 @@ export function AppShell() {
         <div className="absolute top-0 left-0 right-0 h-[400px] bg-gradient-to-br from-liquid-indigo/10 to-transparent pointer-events-none -z-10" />
         <Header />
         <main
-          className={`flex-1 min-h-0 px-4 sm:px-6 lg:px-10 pb-12 max-md:pb-24 pt-2 sm:pt-4 w-full ${
+          className={`flex-1 min-h-0 px-4 sm:px-6 lg:px-10 pb-12 pt-2 sm:pt-4 w-full ${
             isMailPage || isOaPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'
           }`}
         >
@@ -76,7 +75,6 @@ export function AppShell() {
         </main>
       </div>
 
-      <MobileTabBar />
       <Toast />
     </div>
   );

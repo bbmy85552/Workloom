@@ -586,7 +586,7 @@ export function DocsListPage() {
               const currentFolderId = tab === 'public' ? publicFolderId : mineFolderId;
               setCreateOpen({ mode: 'create', parentId: currentFolderId });
             }}
-            className="md:hidden fixed right-5 bottom-[calc(74px+env(safe-area-inset-bottom))] z-40 w-14 h-14 rounded-full bg-liquid-indigo text-white shadow-lg shadow-liquid-indigo/30 flex items-center justify-center active:scale-95 transition-transform"
+            className="md:hidden fixed right-5 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 w-14 h-14 rounded-full bg-liquid-indigo text-white shadow-lg shadow-liquid-indigo/30 flex items-center justify-center active:scale-95 transition-transform"
             aria-label="新建文档"
           >
             <Plus size={26} />
