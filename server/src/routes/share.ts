@@ -230,23 +230,29 @@ shareRouter.get(
     const ownership = isOwnerOrEditor(req.user!.id, resource);
     // 公共文档的普通编辑者经分享开放规则进来时，只看自己创建的链接
     const viaPublic = !ownership && canSharePublicDoc(req.user!, resource);
-    // 被指定可看观看数据的人：只能看到自己被指定的链接
-    let designatedIds: string[] | null = null;
-    if (!ownership && !viaPublic) {
-      const mine = await prisma.shareLinkViewer.findMany({
-        where: { userId: req.user!.id },
-        select: { linkId: true },
-      });
-      designatedIds = mine.map((m) => m.linkId);
-      if (designatedIds.length === 0) throw new HttpError(403, '无权查看', 'FORBIDDEN');
+    // 非所有者可见范围 = 自己创建的链接（公共文档编辑者）∪ 被指定看数据的链接，取并集；
+    // 注意公共文档下 viaPublic 对所有登录用户成立，不能因为走公开规则就漏掉被指定的链接。
+    const mine = await prisma.shareLinkViewer.findMany({
+      where: { userId: req.user!.id },
+      select: { linkId: true },
+    });
+    const designatedIds = mine.map((m) => m.linkId);
+    if (!ownership && !viaPublic && designatedIds.length === 0) {
+      throw new HttpError(403, '无权查看', 'FORBIDDEN');
     }
     const list = await prisma.shareLink.findMany({
       where: {
         resourceType: q.resourceType,
         resourceId: q.resourceId,
         revokedAt: null,
-        ...(viaPublic ? { createdById: req.user!.id } : {}),
-        ...(designatedIds ? { id: { in: designatedIds } } : {}),
+        ...(ownership
+          ? {}
+          : {
+              OR: [
+                ...(viaPublic ? [{ createdById: req.user!.id }] : []),
+                ...(designatedIds.length ? [{ id: { in: designatedIds } }] : []),
+              ],
+            }),
       },
       orderBy: { createdAt: 'desc' },
       include: { createdBy: { select: { id: true, name: true, email: true } } },
