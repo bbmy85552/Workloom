@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Copy, Eye, Link2, Trash2 } from 'lucide-react';
 import { api, asApiError } from '../lib/api';
 import { useUiStore } from '../store/ui';
+import { useAuthStore } from '../store/auth';
 import { Modal } from './Modal';
 import { ShareViewsModal } from './ShareViewsModal';
 import { Avatar, UserPicker } from './UserPicker';
@@ -35,6 +36,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   // 项目记忆只支持协作者，不支持公开分享链接
   const supportsLinks = resourceType !== 'memory';
   const showToast = useUiStore((s) => s.showToast);
+  const me = useAuthStore((s) => s.user);
   const confirmDialog = useUiStore((s) => s.confirmDialog);
   const alertDialog = useUiStore((s) => s.alertDialog);
   const [owner, setOwner] = useState<UserSearchItem | null>(null);
@@ -305,6 +307,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
               {links.map((l) => {
                 const url = `${window.location.origin}/share/${l.token}`;
                 const expired = l.expiresAt ? new Date(l.expiresAt) < new Date() : false;
+                const canManageLink = canManage || me?.role === 'ADMIN' || l.createdBy?.id === me?.id;
                 return (
                   <li
                     key={l.id}
@@ -315,7 +318,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono text-text-primary truncate">{url}</div>
+                      <div className="text-xs font-mono text-text-primary truncate">{canManageLink ? url : '••••••••••••••••'}</div>
                       <div className="flex flex-wrap items-center gap-1 mt-0.5">
                         <span
                           className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
@@ -356,6 +359,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                         <Eye size={14} />
                       </button>
                     )}
+                    {canManageLink && (
                     <button
                       onClick={() => copyLink(l.token)}
                       className="p-1.5 text-text-secondary hover:text-liquid-indigo"
@@ -363,13 +367,16 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                     >
                       <Copy size={14} />
                     </button>
-                    <button
-                      onClick={() => revokeLink(l.id)}
-                      className="p-1.5 text-text-secondary hover:text-red-500"
-                      title="撤销"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    )}
+                    {canManageLink && (
+                      <button
+                        onClick={() => revokeLink(l.id)}
+                        className="p-1.5 text-text-secondary hover:text-red-500"
+                        title="撤销"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </li>
                 );
               })}

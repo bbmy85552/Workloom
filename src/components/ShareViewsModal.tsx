@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { api, asApiError } from '../lib/api';
-import type { ShareLink } from '../lib/types';
+import type { ShareLink, UserSearchItem } from '../lib/types';
+import { X } from 'lucide-react';
+import { UserPicker } from './UserPicker';
+import { useUiStore } from '../store/ui';
 
 interface ViewerUser {
   id: string;
@@ -33,6 +36,7 @@ interface ViewsData {
   summary: { viewers: number; visits: number; avgActiveSec: number };
   byUser: ViewerAgg[];
   sessions: ViewSessionRow[];
+  canManageViewers?: boolean;
 }
 
 function fmtSec(sec: number): string {
@@ -59,6 +63,44 @@ function verdict(v: { activeSec: number; scrollSec: number; maxScrollDepth: numb
 export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: () => void }) {
   const [data, setData] = useState<ViewsData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewers, setViewers] = useState<ViewerUser[]>([]);
+  const showToast = useUiStore((s) => s.showToast);
+
+  const loadViewers = async () => {
+    try {
+      const res = await api.get<{ viewers: ViewerUser[] }>(`/share/views/${link.id}/viewers`);
+      setViewers(res.data.viewers);
+    } catch {
+      /* 无管理权时静默 */
+    }
+  };
+
+  useEffect(() => {
+    if (data?.canManageViewers) void loadViewers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.canManageViewers, link.id]);
+
+  const addViewer = async (u: UserSearchItem) => {
+    try {
+      await api.post(`/share/views/${link.id}/viewers`, { userId: u.id });
+      setViewers((arr) => [
+        ...arr,
+        { id: u.id, name: u.name, email: u.email, avatarUrl: u.avatarUrl ?? null },
+      ]);
+      showToast(`已指定 ${u.name} 可查看`, 'success');
+    } catch (err) {
+      showToast(asApiError(err).error, 'error');
+    }
+  };
+
+  const removeViewer = async (userId: string) => {
+    try {
+      await api.delete(`/share/views/${link.id}/viewers/${userId}`);
+      setViewers((arr) => arr.filter((v) => v.id !== userId));
+    } catch (err) {
+      showToast(asApiError(err).error, 'error');
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -84,6 +126,39 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
               平均认真阅读 {fmtSec(data.summary.avgActiveSec)}
             </span>
           </div>
+          {data.canManageViewers && (
+            <div className="rounded-xl border border-black/5 p-3 space-y-2">
+              <div className="text-xs font-medium text-text-primary">可查看此数据的人</div>
+              <div className="text-[11px] text-text-secondary">
+                链接创建者、文章作者、管理员默认可看；在这里可以再指定其他已登录用户查看这条链接的观看数据。
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {viewers.map((u) => (
+                  <span
+                    key={u.id}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-liquid-indigo/10 text-liquid-indigo text-[11px]"
+                  >
+                    {u.name}
+                    <button
+                      onClick={() => void removeViewer(u.id)}
+                      className="hover:text-danger"
+                      title="移除"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                {viewers.length === 0 && (
+                  <span className="text-[11px] text-text-secondary">尚未指定其他人</span>
+                )}
+              </div>
+              <UserPicker
+                placeholder="输入姓名或邮箱，指定可查看的人…"
+                excludeIds={viewers.map((v) => v.id)}
+                onPick={(u) => void addViewer(u)}
+              />
+            </div>
+          )}
           {data.byUser.length === 0 ? (
             <div className="text-sm text-text-secondary py-2">还没有人打开过这条链接。</div>
           ) : (

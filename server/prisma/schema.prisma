@@ -32,6 +32,7 @@ model User {
   avatarHistory   UserAvatar[]
   shareLinks      ShareLink[] @relation("ShareLinkCreator")
   shareViewSessions ShareViewSession[] @relation("ShareViewUser")
+  shareLinkViewers ShareLinkViewer[] @relation("ShareLinkViewerUser")
   documentVersions DocumentVersion[] @relation("DocVersionAuthor")
   documentComments DocumentComment[] @relation("DocCommentAuthor")
   presence        ResourcePresence[]
@@ -291,6 +292,7 @@ model ShareLink {
   createdById   String
   createdBy     User      @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
   views         ShareViewSession[]
+  statsViewers  ShareLinkViewer[]
   revokedAt     DateTime?
   createdAt     DateTime  @default(now())
 
@@ -313,6 +315,18 @@ model ShareViewSession {
   endedAt        DateTime?
 
   @@index([linkId, startedAt])
+  @@index([userId])
+}
+
+model ShareLinkViewer {
+  id        String    @id @default(cuid())
+  linkId    String
+  link      ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation("ShareLinkViewerUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([linkId, userId])
   @@index([userId])
 }
 

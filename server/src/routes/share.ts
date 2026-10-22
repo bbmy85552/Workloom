@@ -230,13 +230,23 @@ shareRouter.get(
     const ownership = isOwnerOrEditor(req.user!.id, resource);
     // 公共文档的普通编辑者经分享开放规则进来时，只看自己创建的链接
     const viaPublic = !ownership && canSharePublicDoc(req.user!, resource);
-    if (!ownership && !viaPublic) throw new HttpError(403, '无权查看', 'FORBIDDEN');
+    // 被指定可看观看数据的人：只能看到自己被指定的链接
+    let designatedIds: string[] | null = null;
+    if (!ownership && !viaPublic) {
+      const mine = await prisma.shareLinkViewer.findMany({
+        where: { userId: req.user!.id },
+        select: { linkId: true },
+      });
+      designatedIds = mine.map((m) => m.linkId);
+      if (designatedIds.length === 0) throw new HttpError(403, '无权查看', 'FORBIDDEN');
+    }
     const list = await prisma.shareLink.findMany({
       where: {
         resourceType: q.resourceType,
         resourceId: q.resourceId,
         revokedAt: null,
         ...(viaPublic ? { createdById: req.user!.id } : {}),
+        ...(designatedIds ? { id: { in: designatedIds } } : {}),
       },
       orderBy: { createdAt: 'desc' },
       include: { createdBy: { select: { id: true, name: true, email: true } } },
@@ -360,17 +370,27 @@ shareRouter.post(
   }),
 );
 
+async function canManageStatsViewers(
+  user: { id: string; role: string },
+  link: { createdById: string; resourceType: string; resourceId: string },
+): Promise<boolean> {
+  if (link.createdById === user.id || user.role === 'ADMIN') return true;
+  const resource = await loadResource(link.resourceType as 'doc' | 'table', link.resourceId);
+  return isOwnerOrEditor(user.id, resource) === 'owner';
+}
+
 shareRouter.get(
   '/views/:linkId',
   asyncHandler(async (req, res) => {
     const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
     if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
     const me = req.user!;
-    if (link.createdById !== me.id && me.role !== 'ADMIN') {
-      const resource = await loadResource(link.resourceType, link.resourceId);
-      if (isOwnerOrEditor(me.id, resource) !== 'owner') {
-        throw new HttpError(403, '无权查看观看记录', 'FORBIDDEN');
-      }
+    const canManageViewers = await canManageStatsViewers(me, link);
+    if (!canManageViewers) {
+      const designated = await prisma.shareLinkViewer.findUnique({
+        where: { linkId_userId: { linkId: link.id, userId: me.id } },
+      });
+      if (!designated) throw new HttpError(403, '无权查看观看记录', 'FORBIDDEN');
     }
     const sessions = await prisma.shareViewSession.findMany({
       where: { linkId: link.id },
@@ -418,6 +438,65 @@ shareRouter.get(
       summary: { viewers: byUser.length, visits: sessions.length, avgActiveSec },
       byUser,
       sessions,
+      canManageViewers,
     });
+  }),
+);
+
+// 指定查看人：列表（仅管理者：链接创建者/资源所有者/管理员）
+shareRouter.get(
+  '/views/:linkId/viewers',
+  asyncHandler(async (req, res) => {
+    const me = req.user!;
+    const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    if (!(await canManageStatsViewers(me, link))) {
+      throw new HttpError(403, '无权管理查看人', 'FORBIDDEN');
+    }
+    const rows = await prisma.shareLinkViewer.findMany({
+      where: { linkId: link.id },
+      include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({ viewers: rows.map((r) => r.user) });
+  }),
+);
+
+// 指定查看人：添加
+shareRouter.post(
+  '/views/:linkId/viewers',
+  asyncHandler(async (req, res) => {
+    const me = req.user!;
+    const body = z.object({ userId: z.string() }).parse(req.body);
+    const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    if (!(await canManageStatsViewers(me, link))) {
+      throw new HttpError(403, '无权管理查看人', 'FORBIDDEN');
+    }
+    const target = await prisma.user.findUnique({ where: { id: body.userId } });
+    if (!target) throw new HttpError(404, '用户不存在', 'NOT_FOUND');
+    await prisma.shareLinkViewer.upsert({
+      where: { linkId_userId: { linkId: link.id, userId: target.id } },
+      create: { linkId: link.id, userId: target.id },
+      update: {},
+    });
+    res.json({ ok: true });
+  }),
+);
+
+// 指定查看人：移除
+shareRouter.delete(
+  '/views/:linkId/viewers/:userId',
+  asyncHandler(async (req, res) => {
+    const me = req.user!;
+    const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    if (!(await canManageStatsViewers(me, link))) {
+      throw new HttpError(403, '无权管理查看人', 'FORBIDDEN');
+    }
+    await prisma.shareLinkViewer.deleteMany({
+      where: { linkId: link.id, userId: req.params.userId },
+    });
+    res.json({ ok: true });
   }),
 );
