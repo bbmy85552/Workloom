@@ -295,6 +295,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
             )}
           </div>
           {canShare && (
+            <>
           <label className="flex items-center gap-2 mb-2 text-xs text-text-secondary cursor-pointer select-none">
             <input
               type="checkbox"
@@ -309,6 +310,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
               ? '该组合的链接已存在（见下方列表），如需更换请先撤销旧链接。'
               : `将创建：${linkRole === 'edit' ? '可编辑' : '仅查看'}${linkTrack ? ' · 记录观看' : ''}链接（每份资源最多 4 条：查看/编辑 × 记录/不记录）`}
           </div>
+            </>
           )}
           {links.length === 0 ? (
             <div className="text-xs text-text-secondary py-2">还没有分享链接</div>
