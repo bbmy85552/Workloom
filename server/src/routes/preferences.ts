@@ -21,7 +21,7 @@ const prefSchema = z.object({
   notifyInApp: z.boolean().optional(),
   notifyEmail: z.boolean().optional(),
   calendarDefaultRemind: z.number().int().min(0).max(60 * 24 * 7).optional(),
-  language: z.enum(['zh-CN', 'en']).optional(),
+  language: z.enum(['zh-CN', 'en', 'zh-HK']).optional(),
   mailListPageSize: z.number().int().min(10).max(100).optional(),
   mailSyncLimit: z.number().int().min(10).max(200).optional(),
 });

@@ -78,7 +78,7 @@ export interface UserPreferences {
   notifyInApp: boolean;
   notifyEmail: boolean;
   calendarDefaultRemind: number;
-  language: 'zh-CN' | 'en';
+  language: 'zh-CN' | 'en' | 'zh-HK';
   mailListPageSize: number;
   mailSyncLimit: number;
 }

@@ -1,4 +1,5 @@
 import type { UserPreferences } from './types';
+import { exactHk, charHk } from './i18nHk';
 
 export type LanguagePreference = UserPreferences['language'];
 
@@ -36,6 +37,7 @@ const exactEn: Record<string, string> = {
   确定: 'OK',
   确认: 'Confirm',
   简体中文: 'Simplified Chinese',
+  '繁體（粵語）': 'Traditional Chinese (Cantonese)',
   删除: 'Delete',
   添加: 'Add',
   新增: 'New',
@@ -865,10 +867,27 @@ function preserveWhitespace(source: string, translated: string) {
   return `${leading}${translated}${trailing}`;
 }
 
+const hkPhrases = Object.keys(exactHk).sort((a, b) => b.length - a.length);
+
+export function convertToHk(value: string): string {
+  let out = value;
+  for (const phrase of hkPhrases) {
+    if (out.includes(phrase)) out = out.split(phrase).join(exactHk[phrase]);
+  }
+  let result = '';
+  for (const ch of out) result += charHk[ch] ?? ch;
+  return result;
+}
+
 export function translateText(value: string, language: LanguagePreference = 'en') {
-  if (language !== 'en') return value;
+  if (language === 'zh-CN') return value;
   const compact = value.trim().replace(/\s+/g, ' ');
   if (!compact) return value;
+  if (language === 'zh-HK') {
+    const exactHkHit = exactHk[compact];
+    if (exactHkHit !== undefined) return preserveWhitespace(value, exactHkHit);
+    return preserveWhitespace(value, convertToHk(compact));
+  }
   const exact = exactEn[compact];
   if (exact !== undefined) return preserveWhitespace(value, exact);
   for (const [pattern, render] of textPatterns) {
@@ -884,7 +903,7 @@ function translateTextNode(node: Text, language: LanguagePreference) {
   let source = originalText.get(node);
   const lastTranslated = translatedText.get(node);
 
-  if (language !== 'en') {
+  if (language === 'zh-CN') {
     const next = lastTranslated !== undefined && current === lastTranslated && source !== undefined ? source : current;
     originalText.set(node, next);
     translatedText.delete(node);
@@ -896,7 +915,7 @@ function translateTextNode(node: Text, language: LanguagePreference) {
     source = current;
     originalText.set(node, source);
   }
-  const next = translateText(source, 'en');
+  const next = translateText(source, language);
   translatedText.set(node, next);
   if (node.nodeValue !== next) node.nodeValue = next;
 }
@@ -917,7 +936,7 @@ function translateAttrs(el: Element, language: LanguagePreference) {
       translatedAttrs.set(el, translatedMap);
     }
     const lastTranslated = translatedMap.get(attr);
-    if (language !== 'en') {
+    if (language === 'zh-CN') {
       const next = lastTranslated !== undefined && current === lastTranslated && map.has(attr) ? map.get(attr)! : current;
       map.set(attr, next);
       translatedMap.delete(attr);
@@ -969,7 +988,7 @@ export function installI18nDomTranslator() {
   if (typeof window === 'undefined' || observer) return;
   const stored = (window.localStorage.getItem(LANGUAGE_KEY) ??
     window.localStorage.getItem('jianji.language')) as LanguagePreference | null;
-  if (stored === 'en' || stored === 'zh-CN') {
+  if (stored === 'en' || stored === 'zh-CN' || stored === 'zh-HK') {
     document.documentElement.dataset.language = stored;
     document.documentElement.lang = stored;
   }
@@ -1001,7 +1020,8 @@ export function installI18nDomTranslator() {
 
 export function applyLanguage(language?: LanguagePreference | null) {
   if (typeof document === 'undefined') return;
-  const next: LanguagePreference = language === 'en' ? 'en' : 'zh-CN';
+  const next: LanguagePreference =
+    language === 'en' || language === 'zh-HK' ? language : 'zh-CN';
   document.documentElement.dataset.language = next;
   document.documentElement.lang = next;
   try {
