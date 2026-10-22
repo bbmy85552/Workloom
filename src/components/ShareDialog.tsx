@@ -51,22 +51,28 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const collabPath = collaboratorBase(resourceType, resourceId);
-      const [collabRes, linksRes] = await Promise.all([
-        api.get<{ owner: UserSearchItem; collaborators: Collaborator[] }>(collabPath),
-        canShare && supportsLinks
-          ? api.get<{ list: ShareLink[] }>('/share', { params: { resourceType, resourceId } })
-          : Promise.resolve({ data: { list: [] } }),
-      ]);
+      const collabRes = await api.get<{ owner: UserSearchItem; collaborators: Collaborator[] }>(
+        collaboratorBase(resourceType, resourceId),
+      );
       setOwner(collabRes.data.owner);
       setCollaborators(collabRes.data.collaborators);
-      setLinks(linksRes.data.list);
     } catch (err) {
-      showToast(asApiError(err).error, 'error');
-    } finally {
-      setLoading(false);
+      // 被指定看数据的用户没有协作者查看权，静默即可
+      if (canManage) showToast(asApiError(err).error, 'error');
     }
-  }, [canShare, resourceId, resourceType, showToast, supportsLinks]);
+    // 链接列表独立加载：被指定查看观看数据的用户（无创建权）也能拿到自己被指定的链接
+    if (supportsLinks) {
+      try {
+        const linksRes = await api.get<{ list: ShareLink[] }>('/share', {
+          params: { resourceType, resourceId },
+        });
+        setLinks(linksRes.data.list);
+      } catch {
+        setLinks([]);
+      }
+    }
+    setLoading(false);
+  }, [canManage, resourceId, resourceType, showToast, supportsLinks]);
 
   useEffect(() => {
     if (open) void loadAll();
@@ -262,12 +268,13 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
         )}
       </section>
 
-      {canShare && supportsLinks && (
+      {supportsLinks && (canShare || links.length > 0) && (
         <section>
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
               链接分享
             </div>
+            {canShare && (
             <div className="flex items-center gap-2">
               <select
                 value={linkRole}
@@ -285,7 +292,9 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                 <Link2 size={12} /> 生成链接
               </button>
             </div>
+            )}
           </div>
+          {canShare && (
           <label className="flex items-center gap-2 mb-2 text-xs text-text-secondary cursor-pointer select-none">
             <input
               type="checkbox"
@@ -300,6 +309,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
               ? '该组合的链接已存在（见下方列表），如需更换请先撤销旧链接。'
               : `将创建：${linkRole === 'edit' ? '可编辑' : '仅查看'}${linkTrack ? ' · 记录观看' : ''}链接（每份资源最多 4 条：查看/编辑 × 记录/不记录）`}
           </div>
+          )}
           {links.length === 0 ? (
             <div className="text-xs text-text-secondary py-2">还没有分享链接</div>
           ) : (
