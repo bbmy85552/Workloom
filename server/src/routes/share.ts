@@ -173,6 +173,22 @@ shareRouter.post(
     if (ownership !== 'owner' && !canSharePublicDoc(req.user!, resource)) {
       throw new HttpError(403, '只有所有者可以创建分享链接', 'FORBIDDEN');
     }
+    // 同一资源的链接按「权限 × 是否记录观看」分组，每组最多一条有效链接，禁止重复创建。
+    const existing = await prisma.shareLink.findFirst({
+      where: {
+        resourceType: body.resourceType,
+        resourceId: body.resourceId,
+        role: body.role,
+        trackViews: body.trackViews,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: { createdBy: { select: { id: true, name: true, email: true } } },
+    });
+    if (existing) {
+      res.status(409).json({ error: '同类型链接已存在', code: 'DUPLICATE_LINK', link: existing });
+      return;
+    }
     const expiresAt = body.expiresInDays
       ? new Date(Date.now() + body.expiresInDays * 86400_000)
       : null;
@@ -187,6 +203,7 @@ shareRouter.post(
         expiresAt,
         createdById: req.user!.id,
       },
+      include: { createdBy: { select: { id: true, name: true, email: true } } },
     });
     void prisma.auditLog.create({
       data: {
@@ -222,6 +239,7 @@ shareRouter.get(
         ...(viaPublic ? { createdById: req.user!.id } : {}),
       },
       orderBy: { createdAt: 'desc' },
+      include: { createdBy: { select: { id: true, name: true, email: true } } },
     });
     res.json({ list });
   }),

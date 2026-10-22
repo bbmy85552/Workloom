@@ -291,6 +291,7 @@ export interface ShareLink {
   role: 'view' | 'edit';
   requireLogin: boolean;
   trackViews: boolean;
+  createdBy?: { id: string; name: string; email: string };
   expiresAt: string | null;
   createdAt: string;
   revokedAt: string | null;

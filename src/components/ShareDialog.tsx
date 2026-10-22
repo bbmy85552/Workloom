@@ -44,6 +44,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
   const [linkRole, setLinkRole] = useState<'view' | 'edit'>('view');
   const [linkTrack, setLinkTrack] = useState(false);
   const [viewsLink, setViewsLink] = useState<ShareLink | null>(null);
+  const [highlightCombo, setHighlightCombo] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -110,6 +111,13 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
     }
   };
 
+  const comboExists = links.some(
+    (l) =>
+      l.role === linkRole &&
+      l.trackViews === linkTrack &&
+      (!l.expiresAt || new Date(l.expiresAt) > new Date()),
+  );
+
   const createLink = async () => {
     try {
       const { data } = await api.post<{ link: ShareLink }>('/share', {
@@ -121,7 +129,14 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
       setLinks((arr) => [data.link, ...arr]);
       showToast('已生成新链接', 'success');
     } catch (err) {
-      showToast(asApiError(err).error, 'error');
+      const e = asApiError(err);
+      if (e.code === 'DUPLICATE_LINK') {
+        setHighlightCombo(`${linkRole}|${linkTrack}`);
+        window.setTimeout(() => setHighlightCombo(null), 2600);
+        showToast('同类型链接已存在，已在下方标出', 'error');
+      } else {
+        showToast(e.error, 'error');
+      }
     }
   };
 
@@ -262,7 +277,8 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
               </select>
               <button
                 onClick={createLink}
-                className="flex items-center gap-1 px-3 h-8 rounded-md bg-liquid-indigo text-white text-xs hover:bg-primary"
+                disabled={comboExists}
+                className="flex items-center gap-1 px-3 h-8 rounded-md bg-liquid-indigo text-white text-xs hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Link2 size={12} /> 生成链接
               </button>
@@ -277,18 +293,57 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
             />
             记录观看情况（开启后需登录才能打开，并记录每位观看者的停留、滚动与阅读情况）
           </label>
+          <div className={`text-[11px] mb-2 ${comboExists ? 'text-danger' : 'text-text-secondary'}`}>
+            {comboExists
+              ? '该组合的链接已存在（见下方列表），如需更换请先撤销旧链接。'
+              : `将创建：${linkRole === 'edit' ? '可编辑' : '仅查看'}${linkTrack ? ' · 记录观看' : ''}链接（每份资源最多 4 条：查看/编辑 × 记录/不记录）`}
+          </div>
           {links.length === 0 ? (
             <div className="text-xs text-text-secondary py-2">还没有分享链接</div>
           ) : (
             <ul className="space-y-2">
               {links.map((l) => {
                 const url = `${window.location.origin}/share/${l.token}`;
+                const expired = l.expiresAt ? new Date(l.expiresAt) < new Date() : false;
                 return (
-                  <li key={l.id} className="flex items-center gap-2 p-2 rounded-xl border border-black/5">
+                  <li
+                    key={l.id}
+                    className={`flex items-center gap-2 p-2 rounded-xl border ${
+                      highlightCombo === `${l.role}|${l.trackViews}`
+                        ? 'border-liquid-indigo/40 ring-2 ring-liquid-indigo/40'
+                        : 'border-black/5'
+                    }`}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-mono text-text-primary truncate">{url}</div>
+                      <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                            l.role === 'edit'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-black/5 text-text-secondary'
+                          }`}
+                        >
+                          {l.role === 'edit' ? '可编辑' : '仅查看'}
+                        </span>
+                        {l.trackViews && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-liquid-indigo/10 text-liquid-indigo">
+                            <Eye size={10} /> 记录观看
+                          </span>
+                        )}
+                        {l.requireLogin && !l.trackViews && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700">
+                            需登录
+                          </span>
+                        )}
+                        {expired && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-danger">
+                            已过期
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-text-secondary">
-                        {l.role === 'edit' ? '可编辑' : '仅查看'} · 创建于{' '}
+                        {l.createdBy ? `${l.createdBy.name} · ` : ''}创建于{' '}
                         {new Date(l.createdAt).toLocaleString()}
                       </div>
                     </div>
