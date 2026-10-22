@@ -330,7 +330,7 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono text-text-primary truncate">{canManageLink ? url : '••••••••••••••••'}</div>
+                      <div className="text-xs font-mono text-text-primary truncate">{url}</div>
                       <div className="flex flex-wrap items-center gap-1 mt-0.5">
                         <span
                           className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
@@ -371,7 +371,6 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                         <Eye size={14} />
                       </button>
                     )}
-                    {canManageLink && (
                     <button
                       onClick={() => copyLink(l.token)}
                       className="p-1.5 text-text-secondary hover:text-liquid-indigo"
@@ -379,7 +378,6 @@ export function ShareDialog({ open, onClose, resourceType, resourceId, canManage
                     >
                       <Copy size={14} />
                     </button>
-                    )}
                     {canManageLink && (
                       <button
                         onClick={() => revokeLink(l.id)}
