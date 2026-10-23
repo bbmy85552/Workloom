@@ -23,6 +23,8 @@ export const SYSTEM_SETTING_KEYS = {
 
 export interface RuntimeMailConfig {
   enabled: boolean;
+  provider: 'smtp' | 'resend';
+  resendApiKey: string;
   host: string;
   port: number;
   secure: boolean;
@@ -92,31 +94,49 @@ export async function getMailBrandName() {
   );
 }
 
+// When RESEND_API_KEY is configured, system mail is sent through the Resend
+// API instead of SMTP. The sender falls back to the configured MAIL_FROM only
+// when it is explicitly set in the environment (the DB mail_from may point to
+// the old SMTP mailbox, whose domain Resend cannot send from).
+function applyResendOverride(cfg: RuntimeMailConfig): RuntimeMailConfig {
+  if (!env.RESEND_API_KEY) return cfg;
+  return {
+    ...cfg,
+    provider: 'resend',
+    resendApiKey: env.RESEND_API_KEY,
+    from: process.env.MAIL_FROM ? env.MAIL_FROM : cfg.from,
+  };
+}
+
 export async function getRuntimeMailConfig(): Promise<RuntimeMailConfig | null> {
   const map = await getSystemSettingMap();
   if (map[SYSTEM_SETTING_KEYS.mailEnabled] !== undefined) {
     const enabled = toBool(map[SYSTEM_SETTING_KEYS.mailEnabled], false);
     if (!enabled) return null;
     const passEnc = map[SYSTEM_SETTING_KEYS.mailPassEnc] ?? '';
-    return {
+    return applyResendOverride({
       enabled,
+      provider: 'smtp',
+      resendApiKey: '',
       host: map[SYSTEM_SETTING_KEYS.mailHost] ?? '',
       port: toInt(map[SYSTEM_SETTING_KEYS.mailPort], 465),
       secure: toBool(map[SYSTEM_SETTING_KEYS.mailSecure], true),
       user: map[SYSTEM_SETTING_KEYS.mailUser] ?? '',
       pass: passEnc ? decryptSecret(passEnc) : '',
       from: map[SYSTEM_SETTING_KEYS.mailFrom] ?? '',
-    };
+    });
   }
 
   if (!env.MAIL_ENABLED) return null;
-  return {
+  return applyResendOverride({
     enabled: env.MAIL_ENABLED,
+    provider: 'smtp',
+    resendApiKey: '',
     host: env.MAIL_HOST,
     port: env.MAIL_PORT,
     secure: env.MAIL_SECURE,
     user: env.MAIL_USER,
     pass: env.MAIL_PASS,
     from: env.MAIL_FROM,
-  };
+  });
 }

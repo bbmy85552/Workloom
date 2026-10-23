@@ -44,11 +44,40 @@ export interface MailPayload {
   html?: string;
 }
 
+async function sendViaResend(cfg: RuntimeMailConfig, payload: MailPayload) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cfg.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: cfg.from,
+      to: [payload.to],
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Resend 发送失败 (${res.status}): ${body.slice(0, 300)}`);
+  }
+  return { ok: true, transport: 'resend' as const };
+}
+
 export async function sendMail(payload: MailPayload) {
+  const cfg = await getRuntimeMailConfig();
+  if (cfg?.provider === 'resend') {
+    if (!cfg.from) {
+      throw new Error('Resend 配置不完整:请设置 MAIL_FROM。');
+    }
+    return sendViaResend(cfg, payload);
+  }
   const cached = await getTransporter();
   if (!cached) {
     if (env.NODE_ENV !== 'test') {
-      throw new Error('未启用 SMTP，无法发送邮件验证码或通知。请配置 MAIL_ENABLED=true 和 MAIL_*。');
+      throw new Error('未启用邮件发送，无法发送邮件验证码或通知。请配置 MAIL_ENABLED=true 和 RESEND_API_KEY 或 MAIL_*。');
     }
     console.log(
       `[Workloom][MAIL:TEST] 收件人=${payload.to} 主题="${payload.subject}"\n内容:\n${payload.text ?? payload.html ?? ''}`,

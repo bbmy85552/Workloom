@@ -44,6 +44,7 @@ export const env = {
   MAIL_USER: process.env.MAIL_USER ?? '',
   MAIL_PASS: process.env.MAIL_PASS ?? '',
   MAIL_FROM: process.env.MAIL_FROM ?? '文档中心 <no-reply@workloom.local>',
+  RESEND_API_KEY: process.env.RESEND_API_KEY ?? '',
 
   GOOGLE_CLIENT_ID:
     process.env.GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '',
