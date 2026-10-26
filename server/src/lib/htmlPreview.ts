@@ -128,6 +128,7 @@ export async function extractUpload(
     const rel = sanitizeRel(base);
     if (!rel) throw new HttpError(400, '文件名不合法', 'BAD_NAME');
     const abs = path.join(destDir, rel);
+    if (!abs.startsWith(destDir + path.sep)) throw new HttpError(400, '路径不合法', 'BAD_PATH');
     await fsp.writeFile(abs, buffer);
     written.push({ path: rel, size: buffer.length });
     total = buffer.length;
@@ -152,6 +153,7 @@ export async function extractUpload(
       written.push({ path: rel, size: data.length });
       if (written.length > MAX_FILES) throw new HttpError(400, 'zip 内文件数超过 1000 个', 'ZIP_TOO_MANY');
       const abs = path.join(destDir, rel);
+      if (!abs.startsWith(destDir + path.sep)) throw new HttpError(400, '路径不合法', 'BAD_PATH');
       await fsp.mkdir(path.dirname(abs), { recursive: true });
       await fsp.writeFile(abs, data);
     }
