@@ -11,8 +11,6 @@ import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { DocsListPage } from '../pages/docs/DocsListPage';
 import { UserTrashPage } from '../pages/docs/UserTrashPage';
 import { DocDetailPage } from '../pages/docs/DocDetailPage';
-import { HtmlListPage } from '../pages/html/HtmlListPage';
-import { HtmlUploadPage } from '../pages/html/HtmlUploadPage';
 import { HtmlPreviewPage } from '../pages/html/HtmlPreviewPage';
 import { TablesListPage } from '../pages/tables/TablesListPage';
 import { TableDetailPage } from '../pages/tables/TableDetailPage';
@@ -65,8 +63,8 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'docs', element: <DocsListPage /> },
           { path: 'docs/:id', element: <DocDetailPage /> },
-          { path: 'html', element: <HtmlListPage /> },
-          { path: 'html/new', element: <HtmlUploadPage /> },
+          { path: 'html', element: <Navigate to="/app/docs" replace /> },
+          { path: 'html/new', element: <Navigate to="/app/docs" replace /> },
           { path: 'html/:id', element: <HtmlPreviewPage /> },
           { path: 'docs/trash', element: <UserTrashPage /> },
           { path: 'tables', element: <TablesListPage /> },

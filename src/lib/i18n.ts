@@ -784,6 +784,13 @@ const exactEn: Record<string, string> = {
   '上传 HTML demo 或打包好的文件夹，原样查看效果。': 'Upload an HTML demo or a zipped folder and view it as-is.',
   '支持单个 .html / .htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。': 'Supports a single .html / .htm file or a zipped folder; directory structure and relative references inside the zip are preserved.',
   '链接已撤销': 'Link revoked',
+  '上传 HTML': 'Upload HTML',
+  '已移动 HTML 预览': 'HTML preview moved',
+  '重命名 HTML 预览': 'Rename HTML preview',
+  '请输入新的预览标题：': 'Enter a new preview title:',
+  '选择 HTML 或 ZIP 文件': 'Select HTML or ZIP files',
+  '单个 .html/.htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。上传后出现在当前文件夹。': 'A single .html/.htm file, or a packaged .zip; the folder structure and relative references inside the zip are preserved. It will appear in the current folder after upload.',
+  '待上传文件': 'Files to upload',
 };
 
 const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [

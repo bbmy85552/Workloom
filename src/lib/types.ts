@@ -30,6 +30,7 @@ export interface DocNode {
   isFavorite?: boolean;
   favoritedAt?: string;
   isFolder?: boolean;
+  kind?: 'doc' | 'html';
 }
 
 export interface DocDetail extends DocNode {

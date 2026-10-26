@@ -512,7 +512,14 @@ export const exactHk: Record<string, string> = {
  "该预览不存在或无权查看。": "該預覽不存在或無權查看。",
  "上传 HTML demo 或打包好的文件夹，原样查看效果。": "上傳 HTML demo 或打包好的資料夾，原樣查看效果。",
  "支持单个 .html / .htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。": "支持單個 .html / .htm 文件，或打包好的 .zip；zip 內的目錄結構和相對引用會原樣保留。",
- "链接已撤销": "鏈接已撤銷"
+ "链接已撤销": "鏈接已撤銷",
+ "上传 HTML": "上傳 HTML",
+ "已移动 HTML 预览": "已移動 HTML 預覽",
+ "重命名 HTML 预览": "重命名 HTML 預覽",
+ "请输入新的预览标题：": "請輸入新的預覽標題：",
+ "选择 HTML 或 ZIP 文件": "選擇 HTML 或 ZIP 文件",
+ "单个 .html/.htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。上传后出现在当前文件夹。": "單個 .html/.htm 文件，或打包好的 .zip；zip 內的目錄結構和相對引用會原樣保留。上傳後出現在當前資料夾。",
+ "待上传文件": "待上傳文件"
 };
 
 export const charHk: Record<string, string> = {

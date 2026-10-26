@@ -6,6 +6,7 @@ import { useUiStore } from '../../store/ui';
 
 interface TrashItem {
   id: string;
+  kind?: 'doc' | 'html';
   title: string;
   deletedAt: string | null;
   createdById: string;
@@ -23,8 +24,14 @@ export function UserTrashPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<{ list: TrashItem[] }>('/docs/trash');
-      setList(data.list);
+      const [docs, htmls] = await Promise.all([
+        api.get<{ list: TrashItem[] }>('/docs/trash'),
+        api.get<{ list: TrashItem[] }>('/html-previews/trash'),
+      ]);
+      const merged = [...docs.data.list, ...htmls.data.list].sort(
+        (a, b) => new Date(b.deletedAt ?? 0).getTime() - new Date(a.deletedAt ?? 0).getTime(),
+      );
+      setList(merged);
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     } finally {
@@ -38,7 +45,11 @@ export function UserTrashPage() {
 
   const restore = async (item: TrashItem) => {
     try {
-      await api.post(`/docs/trash/${item.id}/restore`);
+      if (item.kind === 'html') {
+        await api.post(`/html-previews/trash/${item.id}/restore`);
+      } else {
+        await api.post(`/docs/trash/${item.id}/restore`);
+      }
       showToast('已恢复', 'success');
       void load();
     } catch (err) {
@@ -55,7 +66,11 @@ export function UserTrashPage() {
     });
     if (!ok) return;
     try {
-      await api.delete(`/docs/trash/${item.id}`);
+      if (item.kind === 'html') {
+        await api.delete(`/html-previews/trash/${item.id}`);
+      } else {
+        await api.delete(`/docs/trash/${item.id}`);
+      }
       showToast('已彻底删除', 'success');
       void load();
     } catch (err) {
@@ -68,7 +83,7 @@ export function UserTrashPage() {
       <header className="mb-8">
         <h1 className="text-3xl sm:text-[36px] font-serif font-bold text-text-primary mb-2">回收站</h1>
         <p className="text-text-secondary">
-          这里是你创建后被删除、或由你删除的公共文档，可以恢复或彻底删除。私人文档删除后不进回收站。
+          这里是你创建后被删除、或由你删除的公共文档，可以恢复或彻底删除。私人文档删除后不进回收站；HTML 预览删除后都会进回收站。
         </p>
       </header>
       <button
@@ -87,6 +102,9 @@ export function UserTrashPage() {
         <ul className="space-y-2">
           {list.map((item) => (
             <li key={item.id} className="glass-card rounded-xl p-4 flex items-center gap-3">
+              {item.kind === 'html' && (
+                <span className="shrink-0 rounded-md bg-liquid-indigo/10 px-2 py-0.5 text-xs text-liquid-indigo">HTML</span>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-text-primary truncate">
                   {item.title || '未命名文档'}

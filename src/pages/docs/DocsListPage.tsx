@@ -79,7 +79,7 @@ export function DocsListPage() {
     () => (localStorage.getItem('docs.layout') as ViewLayout) || 'grid',
   );
   const [createOpen, setCreateOpen] = useState<{
-    mode: 'create' | 'import' | 'folder';
+    mode: 'create' | 'import' | 'folder' | 'html';
     files?: File[];
     parentId?: string | null;
   } | null>(null);
@@ -144,6 +144,14 @@ export function DocsListPage() {
     [navigate, tab, mineFolderId, publicFolderId],
   );
 
+  const openItem = (doc: DocNode) => {
+    if (doc.kind === 'html') {
+      navigate(`/app/html/${doc.id}`);
+      return;
+    }
+    openDoc(doc.id);
+  };
+
   useEffect(() => {
     localStorage.setItem('docs.layout', layout);
   }, [layout]);
@@ -170,7 +178,40 @@ export function DocsListPage() {
     setImportIndex(0);
     setImportFailures([]);
     try {
-      if (createOpen.mode === 'import') {
+      if (createOpen.mode === 'html') {
+        const files = createOpen.files ?? [];
+        if (files.length === 0) return;
+        const uploaded: { id: string; title: string }[] = [];
+        const failed: string[] = [];
+        for (const [index, file] of files.entries()) {
+          setImportIndex(index);
+          try {
+            const data = await uploadFile<{ preview: { id: string; title: string } }>('/html-previews', file, {
+              workspaceKind: createKind,
+              parentId: createOpen.parentId ?? null,
+            });
+            uploaded.push(data.preview);
+          } catch (err) {
+            failed.push(`${file.name}：${asApiError(err).error}`);
+          }
+        }
+        setImportFailures(failed);
+        if (uploaded.length > 0) {
+          await load();
+        }
+        if (failed.length > 0) {
+          showToast(`已上传 ${uploaded.length} 个，失败 ${failed.length} 个`, 'error');
+          return;
+        }
+        showToast(
+          uploaded.length === 1 ? `已上传：${uploaded[0].title}` : `已上传 ${uploaded.length} 个 HTML 预览`,
+          'success',
+        );
+        setCreateOpen(null);
+        if (uploaded.length === 1) {
+          navigate(`/app/html/${uploaded[0].id}`);
+        }
+      } else if (createOpen.mode === 'import') {
         const files = createOpen.files ?? [];
         if (files.length === 0) return;
         const imported: DocNode[] = [];
@@ -237,12 +278,16 @@ export function DocsListPage() {
 
   const moveDoc = async (doc: DocNode, newParentId: string | null) => {
     try {
-      await api.patch(`/docs/${doc.id}`, { parentId: newParentId });
+      if (doc.kind === 'html') {
+        await api.patch(`/html-previews/${doc.id}`, { parentId: newParentId });
+      } else {
+        await api.patch(`/docs/${doc.id}`, { parentId: newParentId });
+      }
       await load();
       if (doc.isFolder) {
         focusFolderLocation(tab, newParentId);
       }
-      showToast(doc.isFolder ? '已移动文件夹' : '已移动文档', 'success');
+      showToast(doc.isFolder ? '已移动文件夹' : doc.kind === 'html' ? '已移动 HTML 预览' : '已移动文档', 'success');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
@@ -256,7 +301,11 @@ export function DocsListPage() {
   const submitMoveToFolder = async () => {
     if (!moveTarget) return;
     try {
-      await api.patch(`/docs/${moveTarget.id}`, { parentId: moveFolderId });
+      if (moveTarget.kind === 'html') {
+        await api.patch(`/html-previews/${moveTarget.id}`, { parentId: moveFolderId });
+      } else {
+        await api.patch(`/docs/${moveTarget.id}`, { parentId: moveFolderId });
+      }
       setMoveTarget(null);
       await load();
       if (moveTarget.isFolder) {
@@ -270,8 +319,8 @@ export function DocsListPage() {
 
   const rename = async (doc: DocNode) => {
     const t = await promptDialog({
-      title: '重命名文档',
-      message: '请输入新的文档标题：',
+      title: doc.kind === 'html' ? '重命名 HTML 预览' : '重命名文档',
+      message: doc.kind === 'html' ? '请输入新的预览标题：' : '请输入新的文档标题：',
       defaultValue: doc.title,
       confirmText: '保存',
     });
@@ -279,7 +328,11 @@ export function DocsListPage() {
     const title = t.trim();
     if (!title || title === doc.title) return;
     try {
-      await api.patch(`/docs/${doc.id}`, { title });
+      if (doc.kind === 'html') {
+        await api.patch(`/html-previews/${doc.id}`, { title });
+      } else {
+        await api.patch(`/docs/${doc.id}`, { title });
+      }
       await load();
       showToast('已重命名', 'success');
     } catch (err) {
@@ -289,14 +342,21 @@ export function DocsListPage() {
 
   const remove = async (doc: DocNode) => {
     const ok = await confirmDialog({
-      title: '删除文档',
-      message: `确认删除文档「${doc.title}」？此操作不可恢复。`,
+      title: doc.kind === 'html' ? '删除 HTML 预览' : '删除文档',
+      message:
+        doc.kind === 'html'
+          ? `确认删除 HTML 预览「${doc.title}」？删除后可在回收站恢复。`
+          : `确认删除文档「${doc.title}」？此操作不可恢复。`,
       confirmText: '删除',
       danger: true,
     });
     if (!ok) return;
     try {
-      await api.delete(`/docs/${doc.id}`);
+      if (doc.kind === 'html') {
+        await api.delete(`/html-previews/${doc.id}`);
+      } else {
+        await api.delete(`/docs/${doc.id}`);
+      }
       await load();
       showToast('已删除', 'success');
     } catch (err) {
@@ -461,6 +521,11 @@ export function DocsListPage() {
 
   const isAdmin = user?.role === 'ADMIN';
   const canManage = (doc: DocNode) => {
+    if (doc.kind === 'html') {
+      if (tab === 'mine') return true;
+      if (tab === 'public') return isAdmin || doc.createdById === user?.id;
+      return false;
+    }
     if (tab === 'mine') return true; // 自己的私人工作区
     if (tab === 'public') return isAdmin || doc.createdById === user?.id;
     return false; // shared 给我看的，不允许在列表内删除
@@ -567,10 +632,15 @@ export function DocsListPage() {
             </div>
           </div>
           <button
-            onClick={() => navigate('/app/html')}
+            onClick={() => {
+              setCreateKind(tab === 'public' ? 'PUBLIC' : 'PRIVATE');
+              setImportFailures([]);
+              const currentFolderId = tab === 'public' ? publicFolderId : mineFolderId;
+              setCreateOpen({ mode: 'html', parentId: currentFolderId });
+            }}
             className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-black/10 text-sm text-text-secondary hover:bg-black/5"
           >
-            <Globe size={16} /> HTML 预览
+            <Globe size={16} /> 上传 HTML
           </button>
           <button
             onClick={() => {
@@ -750,7 +820,7 @@ export function DocsListPage() {
             tree={treeNodes}
             canManage={canManage}
             canEdit={() => canEditCurrentTab}
-            onSelect={(doc) => openDoc(doc.id)}
+            onSelect={(doc) => openItem(doc)}
             onCreateChild={
               treeSupportsManage
                 ? (parent) => {
@@ -822,7 +892,7 @@ export function DocsListPage() {
                   if (doc.isFolder) {
                     if (tab === 'mine') openMineFolder(doc.id);
                     else openPublicFolder(doc.id);
-                  } else openDoc(doc.id);
+                  } else openItem(doc);
                 }}
                 className={`glass-card rounded-xl p-4 w-full text-left flex items-start gap-3 border transition-all duration-200 ${
                   doc.isFolder
@@ -835,7 +905,7 @@ export function DocsListPage() {
                     doc.isFolder ? palette?.tile : 'bg-liquid-indigo/10 text-liquid-indigo border-liquid-indigo/10'
                   }`}
                 >
-                  {doc.isFolder ? <Folder size={18} /> : <FileText size={18} />}
+                  {doc.isFolder ? <Folder size={18} /> : doc.kind === 'html' ? <Globe size={18} /> : <FileText size={18} />}
                 </div>
                 <div className="min-w-0 flex-1 pr-10">
                   <div className="text-sm font-semibold text-text-primary truncate">{doc.title}</div>
@@ -856,6 +926,7 @@ export function DocsListPage() {
                 );
               })()}
               <div className="absolute top-2 right-2 hidden group-hover:flex max-md:flex gap-0.5 bg-white/90 backdrop-blur rounded-lg border border-black/5 shadow-sm">
+                {doc.kind !== 'html' && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -870,6 +941,7 @@ export function DocsListPage() {
                 >
                   <Star size={14} fill={doc.isFavorite ? 'currentColor' : 'none'} />
                 </button>
+                )}
                 {(canManage(doc) || canEditCurrentTab) && (
                   <>
                     {(tab === 'public' || tab === 'mine') && (
@@ -884,7 +956,7 @@ export function DocsListPage() {
                         <Folder size={14} />
                       </button>
                     )}
-                    {tab === 'mine' && !doc.isFolder && (
+                    {doc.kind !== 'html' && tab === 'mine' && !doc.isFolder && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -896,7 +968,7 @@ export function DocsListPage() {
                         <Copy size={14} />
                       </button>
                     )}
-                    {tab === 'mine' && (
+                    {doc.kind !== 'html' && tab === 'mine' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -908,7 +980,7 @@ export function DocsListPage() {
                         <FolderInput size={14} />
                       </button>
                     )}
-                    {tab === 'public' && isAdmin && (
+                    {doc.kind !== 'html' && tab === 'public' && isAdmin && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -962,7 +1034,9 @@ export function DocsListPage() {
             ? '导入到知识库'
             : createOpen?.mode === 'folder'
               ? '新建文件夹'
-              : '新建文档'
+              : createOpen?.mode === 'html'
+                ? '上传 HTML 预览'
+                : '新建文档'
         }
         onClose={() => {
           if (!createSubmitting) setCreateOpen(null);
@@ -1037,10 +1111,28 @@ export function DocsListPage() {
               </div>
             </div>
             )}
-            {createOpen.mode === 'import' && createOpen.files && (
+            {createOpen.mode === 'html' && (
+              <div className="space-y-2">
+                <label className="text-xs text-text-secondary">选择 HTML 或 ZIP 文件</label>
+                <input
+                  type="file"
+                  accept=".html,.htm,.zip"
+                  multiple
+                  disabled={createSubmitting}
+                  onChange={(e) => {
+                    setCreateOpen({ ...createOpen, files: Array.from(e.target.files ?? []) });
+                  }}
+                  className="mt-1 w-full text-sm text-text-secondary file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-liquid-indigo file:text-white file:text-sm"
+                />
+                <p className="text-xs text-text-secondary leading-5">
+                  单个 .html/.htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。上传后出现在当前文件夹。
+                </p>
+              </div>
+            )}
+            {(createOpen.mode === 'import' || createOpen.mode === 'html') && createOpen.files && (
               <div className="space-y-2 rounded-xl border border-black/10 p-3">
                 <div className="flex items-center justify-between text-xs text-text-secondary">
-                  <span>待导入文件</span>
+                  <span>{createOpen.mode === 'html' ? '待上传文件' : '待导入文件'}</span>
                   <span>
                     {createSubmitting
                       ? `${Math.min(importIndex + 1, createOpen.files.length)} / ${createOpen.files.length}`
@@ -1091,10 +1183,14 @@ export function DocsListPage() {
                     ? createOpen.files && createOpen.files.length > 1
                       ? `导入中 ${Math.min(importIndex + 1, createOpen.files.length)}/${createOpen.files.length}`
                       : '导入中…'
-                    : '创建中…'
+                    : createOpen.mode === 'html'
+                      ? '上传中…'
+                      : '创建中…'
                   : createOpen.mode === 'import'
                     ? '导入'
-                    : '创建'}
+                    : createOpen.mode === 'html'
+                      ? '上传'
+                      : '创建'}
               </button>
             </div>
           </div>

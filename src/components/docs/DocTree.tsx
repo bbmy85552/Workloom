@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, ChevronDown, Copy, FileText, Folder, Plus, Pencil, Trash2, FolderInput, FolderOutput } from 'lucide-react';
+import { ChevronRight, ChevronDown, Copy, FileText, Folder, Globe, Plus, Pencil, Trash2, FolderInput, FolderOutput } from 'lucide-react';
 import type { DocNode } from '../../lib/types';
 
 export interface TreeNode extends DocNode {
@@ -107,6 +107,10 @@ export function DocTree({
     if (draggedId === targetId) return;
     const dragged = findNode(draggedId);
     if (!dragged) return;
+    if (targetId) {
+      const target = findNode(targetId);
+      if (target && target.kind === 'html') return;
+    }
     if (targetId && isAncestor(dragged, targetId)) {
       // 阻止把节点拖到自己的子孙下
       return;
@@ -175,6 +179,8 @@ export function DocTree({
               <span className={`w-5 h-5 rounded-md inline-flex items-center justify-center shrink-0 ${treeFolderColor(node.id)}`}>
                 <Folder size={13} />
               </span>
+            ) : node.kind === 'html' ? (
+              <Globe size={13} className="shrink-0 opacity-70" />
             ) : (
               <FileText size={13} className="shrink-0 opacity-70" />
             )}
@@ -209,7 +215,7 @@ export function DocTree({
                   <Pencil size={12} />
                 </button>
               )}
-              {manageable && onCopyToPublic && !node.isFolder && (
+              {manageable && onCopyToPublic && !node.isFolder && node.kind !== 'html' && (
                 <button
                   type="button"
                   title="复制到公共知识库"
@@ -222,7 +228,7 @@ export function DocTree({
                   <Copy size={12} />
                 </button>
               )}
-              {manageable && onMoveToPublic && (
+              {manageable && onMoveToPublic && node.kind !== 'html' && (
                 <button
                   type="button"
                   title="移动到公共知识库"
@@ -235,7 +241,7 @@ export function DocTree({
                   <FolderInput size={12} />
                 </button>
               )}
-              {manageable && onMoveToPrivate && (
+              {manageable && onMoveToPrivate && node.kind !== 'html' && (
                 <button
                   type="button"
                   title="移到我的私密空间"

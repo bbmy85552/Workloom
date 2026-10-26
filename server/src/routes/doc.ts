@@ -256,8 +256,39 @@ docRouter.get(
         isFavorite: favoriteIds.has(d.id),
       }));
     };
-    const mine = annotateFav(mineDocs);
-    const publicDocsWithFav = annotateFav(publicDocs);
+    const mineHtml = await prisma.htmlPreview.findMany({
+      where: { workspaceId: { in: wsIds }, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        parentId: true,
+        workspaceId: true,
+        updatedAt: true,
+        createdById: true,
+        createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const publicHtml = publicWs
+      ? await prisma.htmlPreview.findMany({
+          where: { workspaceId: publicWs.id, deletedAt: null },
+          select: {
+            id: true,
+            title: true,
+            parentId: true,
+            workspaceId: true,
+            updatedAt: true,
+            createdById: true,
+            createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+        })
+      : [];
+    const toHtmlNode = (p: (typeof mineHtml)[number]) => ({ ...p, kind: 'html' as const, isFolder: false });
+    const byUpdatedDesc = (a: { updatedAt: Date }, b: { updatedAt: Date }) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    const mine = [...annotateFav(mineDocs), ...mineHtml.map(toHtmlNode)].sort(byUpdatedDesc);
+    const publicDocsWithFav = [...annotateFav(publicDocs), ...publicHtml.map(toHtmlNode)].sort(byUpdatedDesc);
     const shared = annotateFav(sharedDocs);
     const documentCount = (list: Array<{ isFolder?: boolean }>) =>
       list.filter((item) => !item.isFolder).length;

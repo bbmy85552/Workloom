@@ -55,7 +55,7 @@ async function loadResource(resourceType: string, resourceId: string) {
   }
   if (resourceType === 'html') {
     const preview = await prisma.htmlPreview.findUnique({
-      where: { id: resourceId },
+      where: { id: resourceId, deletedAt: null },
       include: { workspace: true },
     });
     if (!preview) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
@@ -154,7 +154,7 @@ shareRouter.get(
     }
     if (link.resourceType === 'html') {
       const preview = await prisma.htmlPreview.findUnique({
-        where: { id: link.resourceId },
+        where: { id: link.resourceId, deletedAt: null},
         select: { id: true, title: true, entryPath: true },
       });
       if (!preview) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');

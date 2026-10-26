@@ -112,7 +112,7 @@ export function HtmlPreviewPage() {
     try {
       await api.delete(`/html-previews/${id}`);
       showToast('已删除', 'success');
-      navigate('/app/html');
+      navigate('/app/docs');
     } catch (err) {
       showToast(asApiError(err).error, 'error');
     }
@@ -134,7 +134,7 @@ export function HtmlPreviewPage() {
     <div className="py-6 sm:py-8 animate-fade-in-up flex flex-col gap-4">
       <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => navigate('/app/html')}
+          onClick={() => navigate('/app/docs')}
           className="flex items-center gap-1 px-3 py-2 rounded-xl border border-black/10 text-sm text-text-secondary hover:bg-black/5"
         >
           <ArrowLeft size={16} /> 返回列表
