@@ -35,6 +35,7 @@ export function HtmlPreviewPage() {
   const [entry, setEntry] = useState('');
   const [loading, setLoading] = useState(true);
   const [shareUrl, setShareUrl] = useState('');
+  const [shareLinks, setShareLinks] = useState<{ id: string; token: string }[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const reuploadRef = useRef<HTMLInputElement>(null);
@@ -55,6 +56,18 @@ export function HtmlPreviewPage() {
   const htmlFiles = files.filter((f) => /\.html?$/i.test(f.path));
   const frameSrc = meta && entry ? `/api/html-previews/${meta.id}/files/${encodeRelPath(entry)}` : '';
 
+  async function refreshShareLinks() {
+    if (!id) return;
+    try {
+      const { data } = await api.get<{ list: { id: string; token: string }[] }>('/share', {
+        params: { resourceType: 'html', resourceId: id },
+      });
+      setShareLinks(data.list);
+    } catch {
+      setShareLinks([]);
+    }
+  }
+
   async function handleShare() {
     if (!id) return;
     try {
@@ -67,11 +80,13 @@ export function HtmlPreviewPage() {
       });
       setShareUrl(`${window.location.origin}/share/${data.link.token}`);
       setShareOpen(true);
+      refreshShareLinks();
     } catch (err) {
       const resp = (err as { response?: { status?: number; data?: { link?: { token: string } } } }).response;
       if (resp?.status === 409 && resp.data?.link?.token) {
         setShareUrl(`${window.location.origin}/share/${resp.data.link.token}`);
         setShareOpen(true);
+        refreshShareLinks();
       } else {
         showToast(asApiError(err).error, 'error');
       }
@@ -212,6 +227,32 @@ export function HtmlPreviewPage() {
             复制链接
           </button>
         </div>
+        {shareLinks.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2">
+            {shareLinks.map((l) => (
+              <div key={l.id} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate text-text-secondary">
+                  {window.location.origin}/share/{l.token}
+                </span>
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.delete(`/share/${l.id}`);
+                      showToast('链接已撤销', 'success');
+                      if (shareUrl.endsWith(`/share/${l.token}`)) setShareUrl('');
+                      refreshShareLinks();
+                    } catch (err) {
+                      showToast(asApiError(err).error, 'error');
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-black/10 text-xs text-red-600 hover:bg-red-50"
+                >
+                  撤销
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="删除 HTML 预览">

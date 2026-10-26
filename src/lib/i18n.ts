@@ -727,7 +727,7 @@ const exactEn: Record<string, string> = {
   "例如：后端, 部署": "e.g. backend, deployment",
   "请填写记忆内容": "Please enter the memory content",
   "已添加记忆": "Memory added",
-  "已删除": "Deleted",
+'已删除': 'Deleted',
   "已复制": "Copied",
   "确认删除这条记忆？AI 将不再读取到它。": "Delete this memory? AI will no longer be able to read it.",
   "项目已删除": "Project deleted",
@@ -783,6 +783,7 @@ const exactEn: Record<string, string> = {
   '该预览不存在或无权查看。': 'This preview does not exist or you have no access.',
   '上传 HTML demo 或打包好的文件夹，原样查看效果。': 'Upload an HTML demo or a zipped folder and view it as-is.',
   '支持单个 .html / .htm 文件，或打包好的 .zip；zip 内的目录结构和相对引用会原样保留。': 'Supports a single .html / .htm file or a zipped folder; directory structure and relative references inside the zip are preserved.',
+  '链接已撤销': 'Link revoked',
 };
 
 const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
