@@ -110,6 +110,24 @@ export const uploadDocImport = multer({
   },
 });
 
+const HTML_PREVIEW_REGEX = /\.(html?|zip)$/i;
+
+export const uploadHtmlPreview = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const originalName = normalizeFilename(file.originalname);
+    if (
+      /(text\/html|application\/(zip|x-zip-compressed|octet-stream))/i.test(file.mimetype) ||
+      HTML_PREVIEW_REGEX.test(originalName)
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('仅支持 .html / .htm / .zip 文件'));
+    }
+  },
+});
+
 export const uploadCsv = multer({
   storage: makeStorage('imports'),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 },

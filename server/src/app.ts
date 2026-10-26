@@ -15,6 +15,7 @@ import { fontRouter } from './routes/font.js';
 import { adminRouter } from './routes/admin.js';
 import { attachmentRouter } from './routes/attachment.js';
 import { shareRouter } from './routes/share.js';
+import { htmlPreviewRouter } from './routes/htmlPreview.js';
 import { presenceRouter } from './routes/presence.js';
 import { usersRouter } from './routes/users.js';
 import { calendarRouter } from './routes/calendar.js';
@@ -116,6 +117,7 @@ export function createApp() {
   app.use('/api/fonts', fontRouter);
   app.use('/api/attachments', attachmentRouter);
   app.use('/api/share', shareRouter);
+  app.use('/api/html-previews', htmlPreviewRouter);
   app.use('/api/presence', presenceRouter);
   app.use('/api/calendar', calendarRouter);
   app.use('/api/mail', mailRouter);

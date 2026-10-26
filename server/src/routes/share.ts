@@ -53,6 +53,14 @@ async function loadResource(resourceType: string, resourceId: string) {
     if (!tb) throw new HttpError(404, '数据表不存在', 'NOT_FOUND');
     return { kind: 'table' as const, table: tb };
   }
+  if (resourceType === 'html') {
+    const preview = await prisma.htmlPreview.findUnique({
+      where: { id: resourceId },
+      include: { workspace: true },
+    });
+    if (!preview) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+    return { kind: 'html' as const, html: preview };
+  }
   throw new HttpError(400, '资源类型不合法', 'BAD_TYPE');
 }
 
@@ -60,7 +68,8 @@ function isOwnerOrEditor(
   userId: string,
   res:
     | { kind: 'doc'; doc: { workspace: { ownerId: string }; createdById: string; permissions: { userId: string; role: string }[] } }
-    | { kind: 'table'; table: { workspace: { ownerId: string }; createdById: string; permissions: { userId: string; role: string }[] } },
+    | { kind: 'table'; table: { workspace: { ownerId: string }; createdById: string; permissions: { userId: string; role: string }[] } }
+    | { kind: 'html'; html: { workspace: { ownerId: string }; createdById: string } },
 ) {
   if (res.kind === 'doc') {
     const d = res.doc;
@@ -68,6 +77,11 @@ function isOwnerOrEditor(
     const p = d.permissions.find((x) => x.userId === userId);
     if (p?.role === 'EDITOR') return 'editor';
     if (p?.role === 'VIEWER') return 'viewer';
+    return null;
+  }
+  if (res.kind === 'html') {
+    const h = res.html;
+    if (h.workspace.ownerId === userId || h.createdById === userId) return 'owner';
     return null;
   }
   const t = res.table;
@@ -138,6 +152,15 @@ shareRouter.get(
       });
       return;
     }
+    if (link.resourceType === 'html') {
+      const preview = await prisma.htmlPreview.findUnique({
+        where: { id: link.resourceId },
+        select: { id: true, title: true, entryPath: true },
+      });
+      if (!preview) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+      res.json({ resourceType: 'html', role: link.role, requireLogin: link.requireLogin, trackViews: link.trackViews, html: preview });
+      return;
+    }
     throw new HttpError(400, '资源类型不支持', 'BAD_TYPE');
   }),
 );
@@ -160,7 +183,7 @@ shareRouter.post(
   asyncHandler(async (req, res) => {
     const body = z
       .object({
-        resourceType: z.enum(['doc', 'table']),
+        resourceType: z.enum(['doc', 'table', 'html']),
         resourceId: z.string(),
         role: z.enum(['view', 'edit']).default('view'),
         requireLogin: z.boolean().default(false),
@@ -222,7 +245,7 @@ shareRouter.get(
   asyncHandler(async (req, res) => {
     const q = z
       .object({
-        resourceType: z.enum(['doc', 'table']),
+        resourceType: z.enum(['doc', 'table', 'html']),
         resourceId: z.string(),
       })
       .parse(req.query);

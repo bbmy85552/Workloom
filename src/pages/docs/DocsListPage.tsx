@@ -567,6 +567,12 @@ export function DocsListPage() {
             </div>
           </div>
           <button
+            onClick={() => navigate('/app/html')}
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-black/10 text-sm text-text-secondary hover:bg-black/5"
+          >
+            <Globe size={16} /> HTML 预览
+          </button>
+          <button
             onClick={() => {
               setCreateKind(tab === 'public' ? 'PUBLIC' : 'PRIVATE');
               setCreateTitle('未命名文档');

@@ -12,7 +12,7 @@ import type { EditorHeading } from '../../editor/Editor';
 import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
 
 interface SharePayload {
-  resourceType: 'doc' | 'table';
+  resourceType: 'doc' | 'table' | 'html';
   role: 'view' | 'edit';
   requireLogin: boolean;
   trackViews?: boolean;
@@ -25,6 +25,7 @@ interface SharePayload {
     createdBy: { name: string; email: string; avatarUrl: string | null };
   };
   table?: { id: string; name: string; updatedAt: string };
+  html?: { id: string; title: string; entryPath: string };
   fields?: TableField[];
   records?: TableRecord[];
 }
@@ -107,6 +108,10 @@ export function SharePage() {
   }
 
   if (!data) return null;
+
+  if (data.resourceType === 'html' && data.html) {
+    return <HtmlShareView token={token ?? ''} html={data.html} />;
+  }
 
   return (
     <div className="min-h-screen bg-paper-white">
@@ -222,5 +227,44 @@ export function SharePage() {
         )}
       </main>
     </div>
+  );
+}
+
+function HtmlShareView({
+  token,
+  html,
+}: {
+  token: string;
+  html: { id: string; title: string; entryPath: string };
+}) {
+  useEffect(() => {
+    const prevent = (e: Event) => e.preventDefault();
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+        (e.ctrlKey && ['U', 'S'].includes(e.key.toUpperCase()))
+      ) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('contextmenu', prevent);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('contextmenu', prevent);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+  const src = `/api/html-previews/${html.id}/files/${html.entryPath
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}?token=${encodeURIComponent(token)}`;
+  return (
+    <iframe
+      title={html.title}
+      src={src}
+      sandbox="allow-scripts allow-forms allow-modals allow-popups"
+      style={{ position: 'fixed', inset: 0, width: '100%', height: '100dvh', border: 0 }}
+    />
   );
 }

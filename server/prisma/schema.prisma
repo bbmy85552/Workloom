@@ -49,6 +49,7 @@ model User {
   memoryProjectPermissions MemoryProjectPermission[]
   memoryItemsCreated MemoryItem[] @relation("MemoryItemCreator")
   memoryItemsUpdated MemoryItem[] @relation("MemoryItemUpdater")
+  htmlPreviews HtmlPreview[] @relation("HtmlPreviewCreator")
 }
 
 model Session {
@@ -110,6 +111,7 @@ model Workspace {
   documents Document[]
   tables    TableBase[]
   memoryProjects MemoryProject[]
+  htmlPreviews HtmlPreview[]
   createdAt DateTime   @default(now())
 
   @@index([kind])
@@ -580,4 +582,20 @@ model MemoryItem {
   updatedAt   DateTime      @updatedAt
 
   @@index([projectId, deletedAt, pinned, updatedAt])
+}
+
+model HtmlPreview {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation("HtmlPreviewCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  title       String
+  entryPath   String
+  fileCount   Int       @default(0)
+  totalSize   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
