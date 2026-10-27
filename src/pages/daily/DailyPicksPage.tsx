@@ -45,9 +45,17 @@ function todayShanghai(): string {
   return shanghaiDay.format(new Date());
 }
 
+function currentLocale(): string {
+  if (typeof document === 'undefined') return 'zh-CN';
+  const lang = document.documentElement.dataset.language;
+  if (lang === 'en') return 'en-US';
+  if (lang === 'zh-HK') return 'zh-HK';
+  return 'zh-CN';
+}
+
 function fmtDate(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00+08:00`);
-  return d.toLocaleDateString('zh-CN', {
+  return d.toLocaleDateString(currentLocale(), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -57,7 +65,7 @@ function fmtDate(dateStr: string): string {
 }
 
 function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false });
+  return new Date(iso).toLocaleString(currentLocale(), { hour12: false, timeZone: 'Asia/Shanghai' });
 }
 
 export function DailyPicksPage() {
@@ -240,7 +248,7 @@ export function DailyPicksPage() {
                           <span className="flex-1 min-w-0">
                             <span className="block text-sm font-medium text-text-primary truncate">{item.title || '未命名'}</span>
                             <span className="block text-xs text-text-secondary mt-0.5">
-                              {TYPE_LABEL[item.resourceType]} · 分享者 {item.createdByName} · 分享于 {fmtDateTime(item.linkCreatedAt)} · 记录观看
+                              {`${TYPE_LABEL[item.resourceType]} · 分享者 ${item.createdByName} · 分享于 ${fmtDateTime(item.linkCreatedAt)} · 记录观看`}
                             </span>
                           </span>
                         </a>
@@ -309,7 +317,7 @@ export function DailyPicksPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-text-primary truncate">{link.title || '未命名'}</div>
                   <div className="text-xs text-text-secondary mt-0.5">
-                    {TYPE_LABEL[link.resourceType]} · 分享者 {link.createdByName} · 分享于 {fmtDateTime(link.linkCreatedAt)}
+                    {`${TYPE_LABEL[link.resourceType]} · 分享者 ${link.createdByName} · 分享于 ${fmtDateTime(link.linkCreatedAt)}`}
                   </div>
                 </div>
                 <button
