@@ -296,10 +296,23 @@ model ShareLink {
   createdBy     User      @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
   views         ShareViewSession[]
   statsViewers  ShareLinkViewer[]
+  dailyPick     DailyPick?
   revokedAt     DateTime?
   createdAt     DateTime  @default(now())
 
   @@index([resourceType, resourceId])
+}
+
+model DailyPick {
+  id           String    @id @default(cuid())
+  shareLinkId  String    @unique
+  link         ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  featuredDate String
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([featuredDate, sortOrder])
 }
 
 model ShareViewSession {

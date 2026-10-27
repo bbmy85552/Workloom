@@ -15,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Brain,
+  Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
@@ -23,6 +24,7 @@ import { BrandLogo } from '../BrandLogo';
 const navItems = [
   { to: '/app/dashboard', label: '工作台', icon: LayoutGrid },
   { to: '/app/docs', label: '知识库', icon: BookOpen },
+  { to: '/app/daily-picks', label: '每日精选', icon: Sparkles },
   { to: '/app/tables', label: '数据表', icon: Table },
   { to: '/app/memory', label: '项目记忆', icon: Brain },
   { to: '/app/calendar', label: '日历', icon: Calendar },

@@ -6,6 +6,7 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { computeAccess } from '../lib/docAccess.js';
+import { ensureDailyPick } from '../lib/dailyPicks.js';
 import { env } from '../env.js';
 import { verifyToken } from '../lib/jwt.js';
 import { findActiveSessionByToken } from '../lib/session.js';
@@ -228,6 +229,11 @@ shareRouter.post(
       },
       include: { createdBy: { select: { id: true, name: true, email: true } } },
     });
+    // 勾选记录观看的仅查看文档/数据表链接自动进每日精选时间线（默认当天）。
+    // 精选写入失败不拖垮分享创建。
+    if (link.trackViews && link.role === 'view' && (body.resourceType === 'doc' || body.resourceType === 'table')) {
+      await ensureDailyPick(link.id).catch(() => undefined);
+    }
     void prisma.auditLog.create({
       data: {
         actorId: req.user!.id,

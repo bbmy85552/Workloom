@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { SetupPage } from '../pages/setup/SetupPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { DocsListPage } from '../pages/docs/DocsListPage';
+import { DailyPicksPage } from '../pages/daily/DailyPicksPage';
 import { UserTrashPage } from '../pages/docs/UserTrashPage';
 import { DocDetailPage } from '../pages/docs/DocDetailPage';
 import { HtmlPreviewPage } from '../pages/html/HtmlPreviewPage';
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/app/docs" replace /> },
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'docs', element: <DocsListPage /> },
+          { path: 'daily-picks', element: <DailyPicksPage /> },
           { path: 'docs/:id', element: <DocDetailPage /> },
           { path: 'html', element: <Navigate to="/app/docs" replace /> },
           { path: 'html/new', element: <Navigate to="/app/docs" replace /> },
