@@ -89,6 +89,9 @@ export function DocDetailPage() {
   });
   const role = access.role;
   const [title, setTitle] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty' | 'conflict'>('saved');
@@ -241,6 +244,20 @@ export function DocDetailPage() {
     }
   }, [id]);
 
+  const saveTags = useCallback(async (next: string[]) => {
+    if (!id || !canWrite) return;
+    const prev = tags;
+    setTags(next);
+    try {
+      const { data } = await api.patch<{ doc: DocDetail }>(`/docs/${id}`, { tags: next });
+      updatedAtRef.current = data.doc.updatedAt;
+      setDoc(data.doc);
+    } catch (err) {
+      setTags(prev);
+      showToast(asApiError(err).error, 'error');
+    }
+  }, [id, tags, canWrite, showToast]);
+
   const loadComments = useCallback(async () => {
     if (!id) return;
     try {
@@ -259,7 +276,7 @@ export function DocDetailPage() {
           api.get<{ doc: DocDetail; role: DocAccess['role']; access: DocAccess }>(`/docs/${id}`),
           api.get<{ list: BuiltinFont[] }>('/fonts/builtin'),
           api.get<{ list: UserFont[] }>('/fonts'),
-          api.get<{ favorites: { id: string }[] }>('/docs/tree'),
+          api.get<{ favorites: { id: string }[]; mine: { tags?: string[] }[]; public: { tags?: string[] }[]; shared: { tags?: string[] }[] }>('/docs/tree'),
         ]);
         if (docRes.data.doc.isFolder) {
           const nextTab = docRes.data.access.isPublic
@@ -276,6 +293,14 @@ export function DocDetailPage() {
         setDoc(docRes.data.doc);
         setAccess(docRes.data.access);
         setTitle(docRes.data.doc.title);
+        setTags(docRes.data.doc.tags ?? []);
+        {
+          const all = new Set<string>();
+          [treeRes.data.mine, treeRes.data.public, treeRes.data.shared, treeRes.data.favorites].forEach((arr) =>
+            (arr ?? []).forEach((d) => (d.tags ?? []).forEach((t) => all.add(t))),
+          );
+          setAllTags([...all].sort());
+        }
         titleRef.current = docRes.data.doc.title;
         updatedAtRef.current = docRes.data.doc.updatedAt;
         conflictRef.current = false;
@@ -753,6 +778,52 @@ export function DocDetailPage() {
               disabled={!canWrite}
               className="w-full text-3xl sm:text-[40px] font-serif font-bold text-text-primary mb-6 bg-transparent outline-none placeholder-black/20 disabled:opacity-90"
             />
+            {(tags.length > 0 || canWrite) && (
+              <div className="mb-4 flex flex-wrap items-center gap-1.5">
+                {tags.map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1 rounded-full bg-liquid-indigo/10 px-2 py-0.5 text-xs text-liquid-indigo">
+                    {t}
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => void saveTags(tags.filter((x) => x !== t))}
+                        className="hover:text-red-500"
+                        title="移除标签"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+                {canWrite && tags.length < 20 && (
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const v = tagInput.trim();
+                        if (v && !tags.includes(v)) void saveTags([...tags, v]);
+                        setTagInput('');
+                      }
+                    }}
+                    placeholder="添加标签"
+                    maxLength={40}
+                    className="w-28 rounded-full border border-black/10 bg-transparent px-2 py-0.5 text-xs outline-none placeholder-black/30 focus:border-liquid-indigo"
+                  />
+                )}
+                {canWrite && allTags.filter((t) => !tags.includes(t)).slice(0, 10).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => void saveTags([...tags, t])}
+                    className="rounded-full border border-dashed border-black/15 px-2 py-0.5 text-xs text-text-secondary hover:border-liquid-indigo hover:text-liquid-indigo"
+                  >
+                    + {t}
+                  </button>
+                ))}
+              </div>
+            )}
             <RichEditor
               ref={editorRef}
               initialContent={initial}

@@ -72,6 +72,7 @@ export function DocsListPage() {
   const [tree, setTree] = useState<DocTreeResponse | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState('');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   // 从 URL 读取初始 tab 和 folderId，使进入文件夹的状态可分享/刷新保留
   const initialTab = (searchParams.get('tab') as Tab) || 'mine';
   const [tab, setTab] = useState<Tab>(['mine', 'public', 'shared', 'favorites'].includes(initialTab) ? initialTab : 'mine');
@@ -490,16 +491,23 @@ export function DocsListPage() {
             : tree.favorites;
     if (!q) return raw;
     const kw = q.toLowerCase();
-    return raw.filter((d) => d.title.toLowerCase().includes(kw));
+    return raw.filter((d) => d.title.toLowerCase().includes(kw) || (d.tags ?? []).some((t) => t.toLowerCase().includes(kw)));
   })();
-  const displayList =
-    tab === 'public' && !q
+  const displayList = activeTag
+    ? list.filter((d) => (d.tags ?? []).includes(activeTag))
+    : tab === 'public' && !q
       ? list.filter((d) => (d.parentId ?? null) === publicFolderId)
       : tab === 'mine' && !q
         ? list.filter((d) => (d.parentId ?? null) === mineFolderId)
         : list;
 
-  const treeNodes = useMemo(() => buildTree(list), [list]);
+  const tabTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    list.forEach((d) => (d.tags ?? []).forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [list]);
+  const filterTags = activeTag && !tabTags.some(([t]) => t === activeTag) ? [[activeTag, 0], ...tabTags] as [string, number][] : tabTags;
+  const treeNodes = useMemo(() => buildTree(activeTag ? list.filter((d) => (d.tags ?? []).includes(activeTag)) : list), [list, activeTag]);
   const treeSupportsManage = tab === 'mine' || tab === 'public';
   const canDragMove = tab === 'mine' || (tab === 'public' && !!user?.role);
   const tabCounts = {
@@ -802,9 +810,28 @@ export function DocsListPage() {
         </div>
       )}
 
+      {(filterTags.length > 0) && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-text-secondary">按标签筛选</span>
+          {filterTags.map(([t, n]) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setActiveTag(activeTag === t ? null : t)}
+              className={`rounded-full px-2.5 py-1 text-xs ${activeTag === t ? 'bg-liquid-indigo text-white' : 'bg-black/5 text-text-secondary hover:bg-black/10'}`}
+            >
+              {t} ({n})
+            </button>
+          ))}
+          {activeTag && (
+            <button type="button" onClick={() => setActiveTag(null)} className="text-xs text-text-secondary underline">清除筛选</button>
+          )}
+        </div>
+      )}
+
       {displayList.length === 0 ? (
         <div className="glass-card rounded-2xl p-10 text-sm text-text-secondary text-center">
-          {q
+          {q || activeTag
             ? '没有匹配的文档'
             : tab === 'mine'
               ? '私人知识库还没有内容，点击新建或导入开始记录'
@@ -821,6 +848,7 @@ export function DocsListPage() {
             canManage={canManage}
             canEdit={() => canEditCurrentTab}
             onSelect={(doc) => openItem(doc)}
+            onTagClick={(t) => setActiveTag(activeTag === t ? null : t)}
             onCreateChild={
               treeSupportsManage
                 ? (parent) => {
@@ -919,6 +947,19 @@ export function DocsListPage() {
                   {(tab === 'public' || tab === 'shared') && doc.createdBy && (
                     <div className="text-[11px] text-text-secondary mt-1 truncate">
                       {`上传者：${doc.createdBy.name}`}
+                    </div>
+                  )}
+                  {doc.kind !== 'html' && doc.tags && doc.tags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {doc.tags.map((t) => (
+                        <span
+                          key={t}
+                          onClick={(e) => { e.stopPropagation(); setActiveTag(activeTag === t ? null : t); }}
+                          className={`rounded-full px-1.5 py-px text-[11px] ${activeTag === t ? 'bg-liquid-indigo text-white' : 'bg-liquid-indigo/10 text-liquid-indigo'} cursor-pointer`}
+                        >
+                          {t}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>

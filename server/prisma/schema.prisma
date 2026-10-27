@@ -126,6 +126,7 @@ model Document {
   children      Document[] @relation("DocTree")
   title         String
   contentJson   String   @default("")
+  tags          String   @default("[]")
   isArchived    Boolean  @default(false)
   createdById   String
   createdBy     User     @relation("DocCreator", fields: [createdById], references: [id], onDelete: Cascade)

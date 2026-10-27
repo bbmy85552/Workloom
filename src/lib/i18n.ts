@@ -7,6 +7,11 @@ const LANGUAGE_KEY = 'workloom.language';
 
 const exactEn: Record<string, string> = {
   Workloom: 'Workloom',
+  '标签': 'Tags',
+  '添加标签': 'Add tag',
+  '按标签筛选': 'Filter by tag',
+  '清除筛选': 'Clear filter',
+  '移除标签': 'Remove tag',
   文档中心: 'Workspace',
   工作台: 'Dashboard',
   知识库: 'Docs',

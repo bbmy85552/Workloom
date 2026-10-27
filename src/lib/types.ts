@@ -31,6 +31,7 @@ export interface DocNode {
   favoritedAt?: string;
   isFolder?: boolean;
   kind?: 'doc' | 'html';
+  tags?: string[];
 }
 
 export interface DocDetail extends DocNode {

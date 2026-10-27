@@ -50,6 +50,7 @@ interface Props {
   canManage?: (doc: DocNode) => boolean;
   canEdit?: (doc: DocNode) => boolean;
   onSelect: (doc: DocNode) => void;
+  onTagClick?: (tag: string) => void;
   onCreateChild?: (parent: DocNode | null) => void;
   onRename?: (doc: DocNode) => void;
   onDelete?: (doc: DocNode) => void;
@@ -65,6 +66,7 @@ export function DocTree({
   canManage,
   canEdit,
   onSelect,
+  onTagClick,
   onCreateChild,
   onRename,
   onDelete,
@@ -185,6 +187,19 @@ export function DocTree({
               <FileText size={13} className="shrink-0 opacity-70" />
             )}
             <span className="truncate">{node.title}</span>
+            {node.kind !== 'html' && node.tags && node.tags.length > 0 && (
+              <span className="flex gap-1 shrink-0">
+                {node.tags.map((t) => (
+                  <span
+                    key={t}
+                    onClick={onTagClick ? (e) => { e.stopPropagation(); onTagClick(t); } : undefined}
+                    className={`rounded-full bg-liquid-indigo/10 px-1.5 py-px text-[11px] text-liquid-indigo ${onTagClick ? 'cursor-pointer hover:bg-liquid-indigo/20' : ''}`}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </span>
+            )}
           </button>
           {(manageable || editable) && (
             <div className="hidden group-hover:flex max-md:flex items-center gap-0.5">

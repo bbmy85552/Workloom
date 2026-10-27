@@ -13,6 +13,7 @@ import {
 } from '../lib/upload.js';
 import { importByExtension } from '../lib/textImport.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
+import { parseTags, normalizeTags } from '../lib/memoryAccess.js';
 import { createNotification } from '../lib/notify.js';
 import { htmlToDocx, htmlToFullPage, htmlToMarkdown } from '../lib/export.js';
 import { contentDispositionAttachment, normalizeFilename } from '../lib/filename.js';
@@ -114,8 +115,8 @@ function isFolderContent(contentJson: string | null | undefined) {
   return (contentJson ?? '').includes('data-jianji-type="folder"');
 }
 
-function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
-  return { ...doc, isFolder: isFolderContent(doc.contentJson) };
+function withFolderFlag<T extends { contentJson?: string | null; tags?: string | null }>(doc: T) {
+  return { ...doc, isFolder: isFolderContent(doc.contentJson), tags: parseTags(doc.tags ?? null) };
 }
 
 async function findTargetWorkspace(userId: string, kind: 'PRIVATE' | 'PUBLIC') {
@@ -189,6 +190,7 @@ docRouter.get(
             parentId: true,
             workspaceId: true,
             contentJson: true,
+            tags: true,
             updatedAt: true,
             createdById: true,
             workspace: { select: { id: true, name: true, kind: true, ownerId: true } },
@@ -206,7 +208,7 @@ docRouter.get(
 
     const mineDocs = await prisma.document.findMany({
       where: { workspaceId: { in: wsIds }, isArchived: false, deletedAt: null },
-      select: { id: true, title: true, parentId: true, workspaceId: true, contentJson: true, updatedAt: true, createdById: true },
+      select: { id: true, title: true, parentId: true, workspaceId: true, contentJson: true, tags: true, updatedAt: true, createdById: true },
       orderBy: { updatedAt: 'desc' },
     });
     const publicDocs = publicWs
@@ -218,6 +220,7 @@ docRouter.get(
             parentId: true,
             workspaceId: true,
             contentJson: true,
+            tags: true,
             updatedAt: true,
             createdById: true,
             createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -238,6 +241,7 @@ docRouter.get(
         parentId: true,
         workspaceId: true,
         contentJson: true,
+        tags: true,
         updatedAt: true,
         createdById: true,
         workspace: { select: { id: true, name: true, ownerId: true } },
@@ -345,6 +349,7 @@ docRouter.post(
         parentId: z.string().nullable().optional(),
         title: z.string().trim().min(1).max(120).default('未命名文档'),
         contentJson: z.string().max(2_000_000).optional(),
+        tags: z.array(z.string().trim().max(40)).max(20).optional(),
         isFolder: z.boolean().optional(),
       })
       .parse(req.body);
@@ -364,6 +369,7 @@ docRouter.post(
         parentId: body.parentId ?? null,
         title: body.title,
         contentJson: body.isFolder ? FOLDER_CONTENT : body.contentJson ?? '',
+        tags: normalizeTags(body.tags) ?? '[]',
         createdById: req.user!.id,
       },
     });
@@ -644,6 +650,7 @@ docRouter.patch(
       .object({
         title: z.string().trim().min(1).max(120).optional(),
         contentJson: z.string().max(2_000_000).optional(),
+        tags: z.array(z.string().trim().max(40)).max(20).optional(),
         parentId: z.string().nullable().optional(),
         isArchived: z.boolean().optional(),
         // 乐观锁：客户端加载文档时记录的 updatedAt。不匹配表示文档已被他人修改。
@@ -652,7 +659,11 @@ docRouter.patch(
         force: z.boolean().optional(),
       })
       .parse(req.body);
-    const { expectedUpdatedAt, force, ...writeFields } = body;
+    const { expectedUpdatedAt, force, tags: bodyTags, ...writeFields } = body;
+    const data = {
+      ...writeFields,
+      ...(bodyTags !== undefined ? { tags: normalizeTags(bodyTags) ?? '[]' } : {}),
+    };
     if (body.parentId !== undefined && body.parentId !== null) {
       if (body.parentId === doc.id) {
         throw new HttpError(400, '不能将文档移动到自身', 'INVALID_PARENT');
@@ -697,7 +708,7 @@ docRouter.patch(
     try {
       updated = await prisma.document.update({
         where: { id: doc.id, ...versionGuard },
-        data: contentChanged ? { ...writeFields, lastEditedById: req.user!.id } : writeFields,
+        data: contentChanged ? { ...data, lastEditedById: req.user!.id } : data,
       });
     } catch (e: unknown) {
       if (force || !expectedUpdatedAt) throw e;
