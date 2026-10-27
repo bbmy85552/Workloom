@@ -78,6 +78,7 @@ export function DailyPicksPage() {
   const [available, setAvailable] = useState<AvailableLink[]>([]);
   const [adding, setAdding] = useState(false);
   const [statsItem, setStatsItem] = useState<DailyPickItem | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<DailyPickItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,10 +127,10 @@ export function DailyPicksPage() {
   };
 
   const remove = async (item: DailyPickItem) => {
-    if (!window.confirm('确定把这篇从时间线移出吗？分享链接本身不会被撤销。')) return;
     try {
       await api.delete(`/daily-picks/${item.id}`);
       showToast('已从时间线移出', 'success');
+      setPendingRemove(null);
       void load();
     } catch (err) {
       showToast(asApiError(err).error, 'error');
@@ -288,7 +289,7 @@ export function DailyPicksPage() {
                             <ChevronDown size={13} /> 下移
                           </button>
                           <button
-                            onClick={() => void remove(item)}
+                            onClick={() => setPendingRemove(item)}
                             className="px-2 py-1.5 rounded-lg border border-black/10 text-danger hover:bg-black/5 inline-flex items-center gap-1"
                           >
                             <X size={13} /> 移出时间线
@@ -330,6 +331,26 @@ export function DailyPicksPage() {
               </div>
             ))
           )}
+        </div>
+      </Modal>
+
+      <Modal open={pendingRemove !== null} onClose={() => setPendingRemove(null)} title="移出时间线" size="sm">
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">确定把这篇从时间线移出吗？分享链接本身不会被撤销。</p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setPendingRemove(null)}
+              className="px-3 py-1.5 rounded-lg border border-black/10 text-sm text-text-secondary hover:bg-black/5"
+            >
+              取消
+            </button>
+            <button
+              onClick={() => pendingRemove && void remove(pendingRemove)}
+              className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm"
+            >
+              移出时间线
+            </button>
+          </div>
         </div>
       </Modal>
 
