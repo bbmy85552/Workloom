@@ -493,8 +493,40 @@ export function DocsListPage() {
     const kw = q.toLowerCase();
     return raw.filter((d) => d.title.toLowerCase().includes(kw) || (d.tags ?? []).some((t) => t.toLowerCase().includes(kw)));
   })();
+  // 进入文件夹后，标签筛选只算该文件夹及其所有子文件夹（递归子树）；
+  // 根目录（folderId 为空）以及共享/收藏 tab 没有文件夹范围，保持全 tab。
+  const currentFolderId = tab === 'mine' ? mineFolderId : tab === 'public' ? publicFolderId : null;
+  const folderScopeIds = useMemo(() => {
+    if ((tab !== 'mine' && tab !== 'public') || !currentFolderId) return null;
+    const all = tab === 'mine' ? allMineDocs : allPublicDocs;
+    const scope = new Set<string>([currentFolderId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const d of all) {
+        if (d.parentId && scope.has(d.parentId) && !scope.has(d.id)) {
+          scope.add(d.id);
+          grew = true;
+        }
+      }
+    }
+    return scope;
+  }, [tab, currentFolderId, allMineDocs, allPublicDocs]);
+  const inFolderScope = useCallback(
+    (d: DocNode) => !folderScopeIds || folderScopeIds.has(d.id),
+    [folderScopeIds],
+  );
+  // 换文件夹后，若已选标签不在新文件夹子树里，自动清除，避免出现 0 结果的选中态
+  useEffect(() => {
+    if (!activeTag || !folderScopeIds) return;
+    const all = tab === 'mine' ? allMineDocs : allPublicDocs;
+    const stillHas = all.some((d) => folderScopeIds.has(d.id) && (d.tags ?? []).includes(activeTag));
+    if (!stillHas) setActiveTag(null);
+  }, [folderScopeIds, tab, activeTag, allMineDocs, allPublicDocs]);
+
+  const scopedList = folderScopeIds ? list.filter(inFolderScope) : list;
   const displayList = activeTag
-    ? list.filter((d) => (d.tags ?? []).includes(activeTag))
+    ? scopedList.filter((d) => (d.tags ?? []).includes(activeTag))
     : tab === 'public' && !q
       ? list.filter((d) => (d.parentId ?? null) === publicFolderId)
       : tab === 'mine' && !q
@@ -503,11 +535,11 @@ export function DocsListPage() {
 
   const tabTags = useMemo(() => {
     const counts = new Map<string, number>();
-    list.forEach((d) => (d.tags ?? []).forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
+    scopedList.forEach((d) => (d.tags ?? []).forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [list]);
+  }, [scopedList]);
   const filterTags = activeTag && !tabTags.some(([t]) => t === activeTag) ? [[activeTag, 0], ...tabTags] as [string, number][] : tabTags;
-  const treeNodes = useMemo(() => buildTree(activeTag ? list.filter((d) => (d.tags ?? []).includes(activeTag)) : list), [list, activeTag]);
+  const treeNodes = useMemo(() => buildTree(activeTag ? scopedList.filter((d) => (d.tags ?? []).includes(activeTag)) : list), [scopedList, list, activeTag]);
   const treeSupportsManage = tab === 'mine' || tab === 'public';
   const canDragMove = tab === 'mine' || (tab === 'public' && !!user?.role);
   const tabCounts = {
