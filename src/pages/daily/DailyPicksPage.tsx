@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Eye, FileText, Plus, RefreshCw, Sparkles, Table as TableIcon, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Eye, FileText, Plus, RefreshCw, Sparkles, Table as TableIcon, X } from 'lucide-react';
 import { api, asApiError } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
 import type { ShareLink } from '../../lib/types';
 import { Modal } from '../../components/Modal';
 import { ShareViewsModal } from '../../components/ShareViewsModal';
+import { MyViewModal } from '../../components/MyViewModal';
 
 interface DailyPickItem {
   id: string;
@@ -78,6 +79,7 @@ export function DailyPicksPage() {
   const [available, setAvailable] = useState<AvailableLink[]>([]);
   const [adding, setAdding] = useState(false);
   const [statsItem, setStatsItem] = useState<DailyPickItem | null>(null);
+  const [myStatsItem, setMyStatsItem] = useState<DailyPickItem | null>(null);
   const [pendingRemove, setPendingRemove] = useState<DailyPickItem | null>(null);
 
   const load = useCallback(async () => {
@@ -262,6 +264,13 @@ export function DailyPicksPage() {
                             <Eye size={13} /> 查看记录
                           </button>
                         )}
+                        <button
+                          onClick={() => setMyStatsItem(item)}
+                          className="shrink-0 px-2 py-1.5 rounded-lg border border-black/10 text-xs text-text-secondary hover:bg-black/5 inline-flex items-center gap-1"
+                          title="我的阅读"
+                        >
+                          <BookOpen size={13} /> 我的阅读
+                        </button>
                       </div>
                       {isAdmin && (
                         <div className="mt-3 pt-3 border-t border-black/5 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
@@ -355,6 +364,7 @@ export function DailyPicksPage() {
       </Modal>
 
       {statsLink && <ShareViewsModal link={statsLink} onClose={() => setStatsItem(null)} />}
+      {myStatsItem && <MyViewModal linkId={myStatsItem.linkId} title={myStatsItem.title} onClose={() => setMyStatsItem(null)} />}
     </div>
   );
 }

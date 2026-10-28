@@ -39,7 +39,7 @@ interface ViewsData {
   canManageViewers?: boolean;
 }
 
-function fmtSec(sec: number): string {
+export function fmtSec(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   if (s < 60) return `${s} 秒`;
   const m = Math.floor(s / 60);
@@ -47,7 +47,7 @@ function fmtSec(sec: number): string {
   return rest ? `${m} 分 ${rest} 秒` : `${m} 分钟`;
 }
 
-function verdict(v: { activeSec: number; scrollSec: number; maxScrollDepth: number }): {
+export function verdict(v: { activeSec: number; scrollSec: number; maxScrollDepth: number }): {
   label: string;
   cls: string;
 } {

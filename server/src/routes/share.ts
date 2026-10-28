@@ -572,6 +572,38 @@ shareRouter.get(
   }),
 );
 
+// 自己的观看记录：任何登录用户只能看到自己的汇总（每日精选里普通用户看自己的阅读情况）
+shareRouter.get(
+  '/views/:linkId/mine',
+  asyncHandler(async (req, res) => {
+    const link = await prisma.shareLink.findUnique({ where: { id: req.params.linkId } });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    const me = req.user!;
+    const sessions = await prisma.shareViewSession.findMany({
+      where: { linkId: link.id, userId: me.id },
+      orderBy: { startedAt: 'desc' },
+      take: 300,
+    });
+    const mine = {
+      visits: sessions.length,
+      visibleSec: 0,
+      activeSec: 0,
+      scrollSec: 0,
+      maxScrollDepth: 0,
+      lastSeenAt: null as string | null,
+    };
+    for (const s of sessions) {
+      mine.visibleSec += s.visibleSec;
+      mine.activeSec += s.activeSec;
+      mine.scrollSec += s.scrollSec;
+      mine.maxScrollDepth = Math.max(mine.maxScrollDepth, s.maxScrollDepth);
+      const last = s.lastSeenAt.toISOString();
+      if (!mine.lastSeenAt || last > mine.lastSeenAt) mine.lastSeenAt = last;
+    }
+    res.json({ mine, sessions });
+  }),
+);
+
 // 指定查看人：列表（仅管理者：链接创建者/资源所有者/管理员）
 shareRouter.get(
   '/views/:linkId/viewers',
