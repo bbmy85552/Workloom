@@ -229,6 +229,18 @@ shareRouter.post(
       },
       include: { createdBy: { select: { id: true, name: true, email: true } } },
     });
+    // 新链接默认把全体管理员放进查看人名单：不用每篇逐个指定；
+    // 创建人可在观看记录里把某个管理员删掉（不删则默认可见）。
+    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    for (const a of admins) {
+      await prisma.shareLinkViewer
+        .upsert({
+          where: { linkId_userId: { linkId: link.id, userId: a.id } },
+          update: {},
+          create: { linkId: link.id, userId: a.id },
+        })
+        .catch(() => undefined);
+    }
     // 勾选记录观看的仅查看文档/数据表链接自动进每日精选时间线（默认当天）。
     // 精选写入失败不拖垮分享创建。
     if (link.trackViews && link.role === 'view' && (body.resourceType === 'doc' || body.resourceType === 'table')) {
