@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { FileText, Table as TableIcon, ExternalLink, LogIn, UserPlus } from 'lucide-react';
 import { api, asApiError } from '../../lib/api';
@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
 import { RichEditor } from '../../editor/Editor';
 import { DocumentToc } from '../../components/docs/DocumentToc';
+import { ImageLightbox, type LightboxImage } from '../../components/ImageLightbox';
 import type { TableField, TableRecord } from '../../lib/types';
 import type { EditorHeading } from '../../editor/Editor';
 import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
@@ -34,6 +35,8 @@ export function SharePage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const me = useAuthStore((s) => s.user);
+  const authStatus = useAuthStore((s) => s.status);
+  const fetchMe = useAuthStore((s) => s.fetchMe);
   const showToast = useUiStore((s) => s.showToast);
   const [data, setData] = useState<SharePayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,23 @@ export function SharePage() {
       }
     })();
   }, [token]);
+
+  const [lightbox, setLightbox] = useState<{ images: LightboxImage[]; index: number } | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (authStatus === 'idle') void fetchMe();
+  }, [authStatus, fetchMe]);
+
+  const openLightbox = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const img = target.closest('img');
+    if (!img || !contentRef.current) return;
+    const imgs = Array.from(contentRef.current.querySelectorAll('img'));
+    const images = imgs.map((el) => ({ src: el.currentSrc || el.src, alt: el.alt || '' }));
+    const index = Math.max(0, imgs.indexOf(img));
+    if (images.length > 0) setLightbox({ images, index });
+  };
 
   const trackingRef = useRef(false);
   useEffect(() => {
@@ -124,29 +144,35 @@ export function SharePage() {
             <span className="text-text-secondary">
               来自分享 · {data.role === 'edit' ? '可编辑' : '仅查看'}
             </span>
-            {me ? (
-              <button
-                onClick={claim}
-                className="px-3 py-1.5 rounded-lg bg-liquid-indigo text-white text-xs hover:bg-primary flex items-center gap-1"
-              >
-                <ExternalLink size={12} /> 加入协作
-              </button>
-            ) : (
-              <>
-                <Link
-                  to={`/login?next=${encodeURIComponent(`/share/${token}`)}`}
-                  className="px-3 py-1.5 rounded-lg border border-black/10 text-xs hover:bg-black/5 flex items-center gap-1"
-                >
-                  <LogIn size={12} /> 登录
-                </Link>
-                <Link
-                  to={`/register?next=${encodeURIComponent(`/share/${token}`)}`}
-                  className="px-3 py-1.5 rounded-lg bg-liquid-indigo text-white text-xs hover:bg-primary flex items-center gap-1"
-                >
-                  <UserPlus size={12} /> 注册
-                </Link>
-              </>
-            )}
+            {authStatus === 'ready' &&
+              (me ? (
+                <>
+                  <Link to="/app" className="px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary">
+                    {me.name}
+                  </Link>
+                  <button
+                    onClick={claim}
+                    className="px-3 py-1.5 rounded-lg bg-liquid-indigo text-white text-xs hover:bg-primary flex items-center gap-1"
+                  >
+                    <ExternalLink size={12} /> 加入协作
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to={`/login?next=${encodeURIComponent(`/share/${token}`)}`}
+                    className="px-3 py-1.5 rounded-lg border border-black/10 text-xs hover:bg-black/5 flex items-center gap-1"
+                  >
+                    <LogIn size={12} /> 登录
+                  </Link>
+                  <Link
+                    to={`/register?next=${encodeURIComponent(`/share/${token}`)}`}
+                    className="px-3 py-1.5 rounded-lg bg-liquid-indigo text-white text-xs hover:bg-primary flex items-center gap-1"
+                  >
+                    <UserPlus size={12} /> 注册
+                  </Link>
+                </>
+              ))}
           </div>
         </div>
       </header>
@@ -167,8 +193,8 @@ export function SharePage() {
           </div>
         )}
         {data.resourceType === 'doc' && data.doc && (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-            <div className="bg-white border border-black/5 rounded-2xl shadow-sm p-6 sm:p-10">
+          <div className={headings.length > 0 ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]' : 'grid gap-4'}>
+            <div ref={contentRef} onClick={openLightbox} className="share-doc-content bg-white border border-black/5 rounded-2xl shadow-sm p-6 sm:p-10">
               <div className="flex items-center gap-2 text-xs text-text-secondary mb-2">
                 <FileText size={14} />
                 {data.doc.createdBy.name} · 更新于 {new Date(data.doc.updatedAt).toLocaleString()}
@@ -226,6 +252,14 @@ export function SharePage() {
           </div>
         )}
       </main>
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          index={lightbox.index}
+          onIndexChange={(index) => setLightbox((cur) => (cur ? { ...cur, index } : cur))}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }

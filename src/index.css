@@ -446,3 +446,8 @@ html[data-theme='dark'] .border-emerald-100 { border-color: rgba(52, 211, 153, 0
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* 分享页正文图片：点击可放大查看 */
+.share-doc-content img {
+  cursor: zoom-in;
+}
