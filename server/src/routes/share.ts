@@ -5,6 +5,7 @@ import { prisma } from '../prisma.js';
 import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
+import { createNotification } from '../lib/notify.js';
 import { computeAccess } from '../lib/docAccess.js';
 import { ensureDailyPick } from '../lib/dailyPicks.js';
 import { env } from '../env.js';
@@ -176,6 +177,87 @@ function canSharePublicDoc(
   const access = computeAccess(user, res.doc, { publicDefaultWrite: true });
   return access.isPublic && access.canWrite;
 }
+
+// 分享页评论：凭链接 token 查看（公开）/发表（需登录），与正文共用同一道 token 校验。
+const shareCommentAuthorSelect = { id: true, name: true, email: true, avatarUrl: true } as const;
+
+async function loadShareDocForComments(token: string) {
+  const link = await prisma.shareLink.findUnique({ where: { token } });
+  if (!link || link.revokedAt) throw new HttpError(404, '分享链接无效或已被撤销', 'NOT_FOUND');
+  if (link.expiresAt && link.expiresAt < new Date()) throw new HttpError(410, '分享链接已过期', 'EXPIRED');
+  if (link.resourceType !== 'doc') throw new HttpError(400, '该分享不支持评论', 'BAD_TYPE');
+  const doc = await prisma.document.findUnique({ where: { id: link.resourceId, deletedAt: null } });
+  if (!doc) throw new HttpError(404, '文档不存在', 'NOT_FOUND');
+  return { link, doc };
+}
+
+shareRouter.get(
+  '/:token/comments',
+  asyncHandler(async (req, res) => {
+    const { link, doc } = await loadShareDocForComments(req.params.token);
+    if (link.trackViews && !(await optionalUser(req))) {
+      throw new HttpError(401, '需要登录后查看', 'LOGIN_REQUIRED');
+    }
+    const list = await prisma.documentComment.findMany({
+      where: { documentId: doc.id },
+      orderBy: [{ resolvedAt: 'asc' }, { createdAt: 'asc' }],
+      include: { author: { select: shareCommentAuthorSelect } },
+      take: 500,
+    });
+    res.json({ list });
+  }),
+);
+
+shareRouter.post(
+  '/:token/comments',
+  requireAuth,
+  requireEmailVerified,
+  asyncHandler(async (req, res) => {
+    const { doc } = await loadShareDocForComments(req.params.token);
+    const body = z
+      .object({
+        body: z.string().trim().min(1).max(4000),
+        parentId: z.string().nullable().optional(),
+      })
+      .parse(req.body);
+    if (body.parentId) {
+      const parent = await prisma.documentComment.findUnique({ where: { id: body.parentId } });
+      if (!parent || parent.documentId !== doc.id) {
+        throw new HttpError(404, '父评论不存在', 'COMMENT_PARENT_NOT_FOUND');
+      }
+    }
+    const comment = await prisma.documentComment.create({
+      data: {
+        documentId: doc.id,
+        authorId: req.user!.id,
+        body: body.body,
+        parentId: body.parentId ?? null,
+      },
+      include: { author: { select: shareCommentAuthorSelect } },
+    });
+    // 通知文档作者与被回复的评论作者（不通知自己），与站内评论一致
+    const notifyTargets = new Set<string>();
+    if (doc.createdById !== req.user!.id) notifyTargets.add(doc.createdById);
+    if (body.parentId) {
+      const parent = await prisma.documentComment.findUnique({
+        where: { id: body.parentId },
+        select: { authorId: true },
+      });
+      if (parent && parent.authorId !== req.user!.id) notifyTargets.add(parent.authorId);
+    }
+    for (const targetId of notifyTargets) {
+      void createNotification({
+        userId: targetId,
+        category: 'doc_comment',
+        title: `《${doc.title}》有新评论`,
+        body: body.body.slice(0, 120),
+        link: `/app/docs/${doc.id}`,
+        meta: { docId: doc.id, commentId: comment.id },
+      });
+    }
+    res.json({ comment });
+  }),
+);
 
 shareRouter.use(requireAuth, requireEmailVerified);
 

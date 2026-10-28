@@ -8,6 +8,7 @@ import { useUiStore } from '../../store/ui';
 import { RichEditor } from '../../editor/Editor';
 import { DocumentToc } from '../../components/docs/DocumentToc';
 import { ImageLightbox, type LightboxImage } from '../../components/ImageLightbox';
+import { ShareComments } from '../../components/ShareComments';
 import type { TableField, TableRecord } from '../../lib/types';
 import type { EditorHeading } from '../../editor/Editor';
 import { DEFAULT_PUBLIC_SETTINGS, fetchPublicSettings } from '../../lib/publicSettings';
@@ -210,6 +211,7 @@ export function SharePage() {
                 editable={false}
               />
             </div>
+            <ShareComments token={token ?? ''} authReady={authStatus === 'ready'} loggedIn={!!me} />
             <DocumentToc headings={headings} />
           </div>
         )}
