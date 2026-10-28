@@ -195,6 +195,7 @@ export function SharePage() {
         )}
         {data.resourceType === 'doc' && data.doc && (
           <div className={headings.length > 0 ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]' : 'grid gap-4'}>
+            <div className="min-w-0 space-y-4">
             <div ref={contentRef} onClick={openLightbox} className="share-doc-content bg-white border border-black/5 rounded-2xl shadow-sm p-6 sm:p-10">
               <div className="flex items-center gap-2 text-xs text-text-secondary mb-2">
                 <FileText size={14} />
@@ -212,6 +213,7 @@ export function SharePage() {
               />
             </div>
             <ShareComments token={token ?? ''} authReady={authStatus === 'ready'} loggedIn={!!me} />
+            </div>
             <DocumentToc headings={headings} />
           </div>
         )}
