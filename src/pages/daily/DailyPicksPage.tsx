@@ -364,7 +364,7 @@ export function DailyPicksPage() {
       </Modal>
 
       {statsLink && <ShareViewsModal link={statsLink} onClose={() => setStatsItem(null)} />}
-      {myStatsItem && <MyViewModal linkId={myStatsItem.linkId} title={myStatsItem.title} onClose={() => setMyStatsItem(null)} />}
+      {myStatsItem && <MyViewModal linkId={myStatsItem.linkId} title={myStatsItem.title} resourceType={myStatsItem.resourceType} onClose={() => setMyStatsItem(null)} />}
     </div>
   );
 }

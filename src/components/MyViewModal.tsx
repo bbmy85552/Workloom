@@ -27,7 +27,8 @@ function fmtDateTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-export function MyViewModal({ linkId, title, onClose }: { linkId: string; title: string; onClose: () => void }) {
+export function MyViewModal({ linkId, title, resourceType, onClose }: { linkId: string; title: string; resourceType: 'doc' | 'table' | 'html'; onClose: () => void }) {
+  const isHtml = resourceType === 'html';
   const [mine, setMine] = useState<MineAgg | null>(null);
   const [sessions, setSessions] = useState<MySessionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export function MyViewModal({ linkId, title, onClose }: { linkId: string; title:
   }, [linkId]);
 
   const v =
-    mine && mine.visits > 0
+    !isHtml && mine && mine.visits > 0
       ? verdict({ activeSec: mine.activeSec, scrollSec: mine.scrollSec, maxScrollDepth: mine.maxScrollDepth })
       : null;
 
@@ -75,18 +76,27 @@ export function MyViewModal({ linkId, title, onClose }: { linkId: string; title:
                 <dt className="text-xs text-text-secondary">打开次数</dt>
                 <dd className="font-medium text-text-primary">{mine.visits} 次</dd>
               </div>
-              <div className="rounded-xl border border-black/5 px-3 py-2">
-                <dt className="text-xs text-text-secondary">活跃时长</dt>
-                <dd className="font-medium text-text-primary">{fmtSec(mine.activeSec)}</dd>
-              </div>
-              <div className="rounded-xl border border-black/5 px-3 py-2">
-                <dt className="text-xs text-text-secondary">滚动时长</dt>
-                <dd className="font-medium text-text-primary">{fmtSec(mine.scrollSec)}</dd>
-              </div>
-              <div className="rounded-xl border border-black/5 px-3 py-2">
-                <dt className="text-xs text-text-secondary">最深滚动</dt>
-                <dd className="font-medium text-text-primary">{mine.maxScrollDepth}%</dd>
-              </div>
+              {isHtml ? (
+                <div className="rounded-xl border border-black/5 px-3 py-2">
+                  <dt className="text-xs text-text-secondary">停留（可见）</dt>
+                  <dd className="font-medium text-text-primary">{fmtSec(mine.visibleSec)}</dd>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-black/5 px-3 py-2">
+                    <dt className="text-xs text-text-secondary">活跃时长</dt>
+                    <dd className="font-medium text-text-primary">{fmtSec(mine.activeSec)}</dd>
+                  </div>
+                  <div className="rounded-xl border border-black/5 px-3 py-2">
+                    <dt className="text-xs text-text-secondary">滚动时长</dt>
+                    <dd className="font-medium text-text-primary">{fmtSec(mine.scrollSec)}</dd>
+                  </div>
+                  <div className="rounded-xl border border-black/5 px-3 py-2">
+                    <dt className="text-xs text-text-secondary">最深滚动</dt>
+                    <dd className="font-medium text-text-primary">{mine.maxScrollDepth}%</dd>
+                  </div>
+                </>
+              )}
               <div className="col-span-2 rounded-xl border border-black/5 px-3 py-2">
                 <dt className="text-xs text-text-secondary">最近打开</dt>
                 <dd className="font-medium text-text-primary">{mine.lastSeenAt ? fmtDateTime(mine.lastSeenAt) : '—'}</dd>
@@ -102,10 +112,16 @@ export function MyViewModal({ linkId, title, onClose }: { linkId: string; title:
                   >
                     <span className="text-text-primary">第 {sessions.length - i} 次</span>
                     <span>{fmtDateTime(s.startedAt)}</span>
-                    <span>活跃 {fmtSec(s.activeSec)}</span>
-                    <span>滚动 {fmtSec(s.scrollSec)}</span>
-                    <span>最深 {s.maxScrollDepth}%</span>
-                    <span className={`rounded-full px-1.5 py-0.5 ${sv.cls}`}>{sv.label}</span>
+                    {isHtml ? (
+                      <span>停留 {fmtSec(s.visibleSec)}</span>
+                    ) : (
+                      <>
+                        <span>活跃 {fmtSec(s.activeSec)}</span>
+                        <span>滚动 {fmtSec(s.scrollSec)}</span>
+                        <span>最深 {s.maxScrollDepth}%</span>
+                        <span className={`rounded-full px-1.5 py-0.5 ${sv.cls}`}>{sv.label}</span>
+                      </>
+                    )}
                   </div>
                 );
               })}

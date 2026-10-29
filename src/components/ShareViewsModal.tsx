@@ -64,6 +64,7 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
   const [data, setData] = useState<ViewsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewers, setViewers] = useState<ViewerUser[]>([]);
+  const isHtml = link.resourceType === 'html';
   const showToast = useUiStore((s) => s.showToast);
 
   const loadViewers = async () => {
@@ -122,9 +123,11 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="px-2.5 py-1 rounded-full bg-black/5">观看人数 {data.summary.viewers}</span>
             <span className="px-2.5 py-1 rounded-full bg-black/5">打开次数 {data.summary.visits}</span>
-            <span className="px-2.5 py-1 rounded-full bg-black/5">
-              平均认真阅读 {fmtSec(data.summary.avgActiveSec)}
-            </span>
+            {!isHtml && (
+              <span className="px-2.5 py-1 rounded-full bg-black/5">
+                平均认真阅读 {fmtSec(data.summary.avgActiveSec)}
+              </span>
+            )}
           </div>
           {data.canManageViewers && (
             <div className="rounded-xl border border-black/5 p-3 space-y-2">
@@ -168,12 +171,12 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
                   <tr className="text-left text-text-secondary border-b border-black/5">
                     <th className="py-2 pr-3 font-medium">观看者</th>
                     <th className="py-2 pr-3 font-medium">次数</th>
-                    <th className="py-2 pr-3 font-medium">认真阅读</th>
+                    {!isHtml && <th className="py-2 pr-3 font-medium">认真阅读</th>}
                     <th className="py-2 pr-3 font-medium">停留（可见）</th>
-                    <th className="py-2 pr-3 font-medium">滚动时长</th>
-                    <th className="py-2 pr-3 font-medium">最深滚动</th>
+                    {!isHtml && <th className="py-2 pr-3 font-medium">滚动时长</th>}
+                    {!isHtml && <th className="py-2 pr-3 font-medium">最深滚动</th>}
                     <th className="py-2 pr-3 font-medium">最近打开</th>
-                    <th className="py-2 font-medium">判定</th>
+                    {!isHtml && <th className="py-2 font-medium">判定</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -186,16 +189,18 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
                           <div className="text-text-secondary">{v.user.email}</div>
                         </td>
                         <td className="py-2 pr-3">{v.visits}</td>
-                        <td className="py-2 pr-3">{fmtSec(v.activeSec)}</td>
+                        {!isHtml && <td className="py-2 pr-3">{fmtSec(v.activeSec)}</td>}
                         <td className="py-2 pr-3">{fmtSec(v.visibleSec)}</td>
-                        <td className="py-2 pr-3">{fmtSec(v.scrollSec)}</td>
-                        <td className="py-2 pr-3">{v.maxScrollDepth}%</td>
+                        {!isHtml && <td className="py-2 pr-3">{fmtSec(v.scrollSec)}</td>}
+                        {!isHtml && <td className="py-2 pr-3">{v.maxScrollDepth}%</td>}
                         <td className="py-2 pr-3 whitespace-nowrap">
                           {new Date(v.lastSeenAt).toLocaleString()}
                         </td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded-full ${vd.cls}`}>{vd.label}</span>
-                        </td>
+                        {!isHtml && (
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded-full ${vd.cls}`}>{vd.label}</span>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -215,20 +220,28 @@ export function ShareViewsModal({ link, onClose }: { link: ShareLink; onClose: (
                     <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       <span className="text-text-primary font-medium">{s.user.name}</span>
                       <span>{new Date(s.startedAt).toLocaleString()}</span>
-                      <span>认真阅读 {fmtSec(s.activeSec)}</span>
-                      <span>
-                        滚动 {fmtSec(s.scrollSec)} · 最深 {s.maxScrollDepth}%
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full ${vd.cls}`}>{vd.label}</span>
+                      {isHtml ? (
+                        <span>停留 {fmtSec(s.visibleSec)}</span>
+                      ) : (
+                        <>
+                          <span>认真阅读 {fmtSec(s.activeSec)}</span>
+                          <span>
+                            滚动 {fmtSec(s.scrollSec)} · 最深 {s.maxScrollDepth}%
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full ${vd.cls}`}>{vd.label}</span>
+                        </>
+                      )}
                     </li>
                   );
                 })}
               </ul>
             </div>
           )}
-          <p className="text-[11px] text-text-secondary">
-            说明：认真阅读＝页面在前台、且 30 秒内有滑动或操作的时间；切去别的标签页、挂后台都不计入。判定仅供参考。
-          </p>
+          {!isHtml && (
+            <p className="text-[11px] text-text-secondary">
+              说明：认真阅读＝页面在前台、且 30 秒内有滑动或操作的时间；切去别的标签页、挂后台都不计入。判定仅供参考。
+            </p>
+          )}
         </div>
       )}
     </Modal>
