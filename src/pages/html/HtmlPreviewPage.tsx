@@ -207,7 +207,8 @@ export function HtmlPreviewPage() {
           key={frameSrc}
           title={meta.title}
           src={frameSrc}
-          sandbox="allow-scripts allow-forms allow-modals allow-popups"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+          allow="clipboard-write; fullscreen"
           style={{ width: '100%', height: 'calc(100dvh - 190px)', minHeight: 480, border: 0 }}
           className="rounded-xl border border-black/10 bg-white"
         />

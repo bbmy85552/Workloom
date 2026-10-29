@@ -301,7 +301,8 @@ function HtmlShareView({
     <iframe
       title={html.title}
       src={src}
-      sandbox="allow-scripts allow-forms allow-modals allow-popups"
+      sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+      allow="clipboard-write; fullscreen"
       style={{ position: 'fixed', inset: 0, width: '100%', height: '100dvh', border: 0 }}
     />
   );
