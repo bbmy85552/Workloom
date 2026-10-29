@@ -83,10 +83,10 @@ export function SharePage() {
   const trackingRef = useRef(false);
   useEffect(() => {
     if (!token || !data?.trackViews || data.loginRequired) return;
-    if (!data.doc && !data.table) return;
+    if (!data.doc && !data.table && !data.html) return;
     if (trackingRef.current) return;
     trackingRef.current = true;
-    const stop = startShareTracking(token);
+    const stop = startShareTracking(token, data.resourceType === 'html' ? { trackActivity: false } : undefined);
     return () => {
       stop();
       trackingRef.current = false;

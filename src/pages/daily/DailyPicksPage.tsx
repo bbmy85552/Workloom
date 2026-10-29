@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronDown, ChevronUp, Eye, FileText, Plus, RefreshCw, Sparkles, Table as TableIcon, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Eye, FileText, Globe, Plus, RefreshCw, Sparkles, Table as TableIcon, X } from 'lucide-react';
 import { api, asApiError } from '../../lib/api';
 import { useAuthStore } from '../../store/auth';
 import { useUiStore } from '../../store/ui';
@@ -14,7 +14,7 @@ interface DailyPickItem {
   sortOrder: number;
   linkId: string;
   token: string;
-  resourceType: 'doc' | 'table';
+  resourceType: 'doc' | 'table' | 'html';
   resourceId: string;
   title: string;
   createdByName: string;
@@ -26,14 +26,14 @@ interface DailyPickItem {
 interface AvailableLink {
   linkId: string;
   token: string;
-  resourceType: 'doc' | 'table';
+  resourceType: 'doc' | 'table' | 'html';
   resourceId: string;
   title: string;
   createdByName: string;
   linkCreatedAt: string;
 }
 
-const TYPE_LABEL: Record<string, string> = { doc: '文档', table: '数据表' };
+const TYPE_LABEL: Record<string, string> = { doc: '文档', table: '数据表', html: 'HTML' };
 
 const shanghaiDay = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Shanghai',
@@ -235,7 +235,7 @@ export function DailyPicksPage() {
               </div>
               <ul className="space-y-2">
                 {group.map((item, idx) => {
-                  const Icon = item.resourceType === 'doc' ? FileText : TableIcon;
+                  const Icon = item.resourceType === 'doc' ? FileText : item.resourceType === 'html' ? Globe : TableIcon;
                   return (
                     <li key={item.id} className="glass-card rounded-xl px-4 py-3">
                       <div className="flex items-center gap-3">

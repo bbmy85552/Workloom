@@ -323,9 +323,9 @@ shareRouter.post(
         })
         .catch(() => undefined);
     }
-    // 勾选记录观看的仅查看文档/数据表链接自动进每日精选时间线（默认当天）。
+    // 勾选记录观看的仅查看链接自动进每日精选时间线（默认当天，含 HTML）。
     // 精选写入失败不拖垮分享创建。
-    if (link.trackViews && link.role === 'view' && (body.resourceType === 'doc' || body.resourceType === 'table')) {
+    if (link.trackViews && link.role === 'view' && (body.resourceType === 'doc' || body.resourceType === 'table' || body.resourceType === 'html')) {
       await ensureDailyPick(link.id).catch(() => undefined);
     }
     void prisma.auditLog.create({

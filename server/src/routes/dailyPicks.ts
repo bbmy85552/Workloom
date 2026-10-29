@@ -5,10 +5,9 @@ import { asyncHandler, HttpError } from '../lib/asyncHandler.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { ensureDailyPick, isValidDateString, shanghaiDate } from '../lib/dailyPicks.js';
 
-// 每日精选时间线：只收「仅查看 + 勾选记录观看」的文档/数据表分享链接。
-// HTML 预览的分享页不跑观看心跳（SharePage 只对 doc/table 启动跟踪），
-// 所以 HTML 链接不进时间线，避免卡片承诺了记录却记不到。
-// 卡片点开的是分享链接本身，滚动与阅读时长由现有的分享跟踪记。
+// 每日精选时间线：只收「仅查看 + 勾选记录观看」的分享链接（含 HTML）。
+// HTML 分享页跑精简版心跳：隔着沙箱 iframe 量不到活跃/滚动/深度，
+// 只记打开次数与页面可见时长，判定恒为「打开未看」；卡片点开的是分享链接本身。
 
 export const dailyPicksRouter = Router();
 dailyPicksRouter.use(requireAuth);
@@ -32,7 +31,7 @@ function isLinkActive(link: PickLink, now: Date): boolean {
   return (
     link.trackViews &&
     link.role === 'view' &&
-    (link.resourceType === 'doc' || link.resourceType === 'table') &&
+    (link.resourceType === 'doc' || link.resourceType === 'table' || link.resourceType === 'html') &&
     !link.revokedAt &&
     (!link.expiresAt || link.expiresAt > now)
   );
@@ -41,6 +40,7 @@ function isLinkActive(link: PickLink, now: Date): boolean {
 async function resolveTitles(links: PickLink[]) {
   const docIds = [...new Set(links.filter((l) => l.resourceType === 'doc').map((l) => l.resourceId))];
   const tableIds = [...new Set(links.filter((l) => l.resourceType === 'table').map((l) => l.resourceId))];
+  const htmlIds = [...new Set(links.filter((l) => l.resourceType === 'html').map((l) => l.resourceId))];
   const docs = docIds.length
     ? await prisma.document.findMany({
         where: { id: { in: docIds }, deletedAt: null },
@@ -53,9 +53,16 @@ async function resolveTitles(links: PickLink[]) {
         select: { id: true, name: true, createdById: true, workspace: { select: { ownerId: true } } },
       })
     : [];
+  const htmls = htmlIds.length
+    ? await prisma.htmlPreview.findMany({
+        where: { id: { in: htmlIds }, deletedAt: null },
+        select: { id: true, title: true, workspace: { select: { ownerId: true } } },
+      })
+    : [];
   const map = new Map<string, { title: string; ownerId: string }>();
   for (const d of docs) map.set(`doc:${d.id}`, { title: d.title, ownerId: d.workspace.ownerId });
   for (const t of tables) map.set(`table:${t.id}`, { title: t.name, ownerId: t.workspace.ownerId });
+  for (const h of htmls) map.set(`html:${h.id}`, { title: h.title, ownerId: h.workspace.ownerId });
   return map;
 }
 
@@ -97,7 +104,7 @@ dailyPicksRouter.get(
           sortOrder: p.sortOrder,
           linkId: link.id,
           token: link.token,
-          resourceType: link.resourceType as 'doc' | 'table',
+          resourceType: link.resourceType as 'doc' | 'table' | 'html',
           resourceId: link.resourceId,
           title: info.title,
           createdByName: link.createdBy.name,
@@ -131,7 +138,7 @@ dailyPicksRouter.get(
       .map((l) => ({
         linkId: l.id,
         token: l.token,
-        resourceType: l.resourceType as 'doc' | 'table',
+        resourceType: l.resourceType as 'doc' | 'table' | 'html',
         resourceId: l.resourceId,
         title: titles.get(`${l.resourceType}:${l.resourceId}`)!.title,
         createdByName: l.createdBy.name,

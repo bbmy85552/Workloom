@@ -288,7 +288,7 @@ export interface Collaborator {
 export interface ShareLink {
   id: string;
   token: string;
-  resourceType: 'doc' | 'table';
+  resourceType: 'doc' | 'table' | 'html';
   resourceId: string;
   role: 'view' | 'edit';
   requireLogin: boolean;

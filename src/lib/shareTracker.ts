@@ -2,7 +2,10 @@
 // 每 5 秒心跳上报累计快照，页面隐藏或关闭时用 sendBeacon 补发最终值。
 // 活跃 = 页面在前台且 30 秒内有过滑动、按键、点按或鼠标移动（挂后台看别的不算看）。
 // 服务端按单调最大值存储，乱序到达的心跳不会把数据冲小。
-export function startShareTracking(token: string): () => void {
+export function startShareTracking(token: string, opts?: { trackActivity?: boolean }): () => void {
+  // 精简模式（HTML 沙箱 iframe 页）：只记打开次数与页面可见时长，
+  // 不量活跃/滚动/深度——父页面量不到 iframe 里的动作，量了也是假数据。
+  const trackActivity = opts?.trackActivity !== false;
   let sessionId: string | null = null;
   let visibleSec = 0;
   let activeSec = 0;
@@ -30,6 +33,7 @@ export function startShareTracking(token: string): () => void {
   const tick = window.setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     visibleSec += 1;
+    if (!trackActivity) return;
     if (Date.now() - lastInteractAt <= 30_000) activeSec += 1;
     if (lastScrollAt > 0 && Date.now() - lastScrollAt <= 1500) scrollSec += 1;
   }, 1000);
@@ -60,14 +64,16 @@ export function startShareTracking(token: string): () => void {
   };
   const onPageHide = () => send(true);
 
-  window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('keydown', markInteract);
-  window.addEventListener('mousemove', markInteract, { passive: true });
-  window.addEventListener('touchstart', markInteract, { passive: true });
-  window.addEventListener('click', markInteract);
+  if (trackActivity) {
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('keydown', markInteract);
+    window.addEventListener('mousemove', markInteract, { passive: true });
+    window.addEventListener('touchstart', markInteract, { passive: true });
+    window.addEventListener('click', markInteract);
+    measureDepth();
+  }
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', onPageHide);
-  measureDepth();
 
   void (async () => {
     try {
