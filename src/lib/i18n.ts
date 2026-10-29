@@ -40,6 +40,7 @@ const exactEn: Record<string, string> = {
   '移出时间线': 'Remove from timeline',
   '查看记录': 'View stats',
   '记录观看': 'Recorded views',
+  '记录观看情况（开启后需登录才能打开，并记录每位观看者的打开次数与可见时长）': 'Record views (viewers must sign in; records each viewer’s opens and visible time)',
   上移: 'Move up',
   下移: 'Move down',
   已调整日期: 'Date updated',

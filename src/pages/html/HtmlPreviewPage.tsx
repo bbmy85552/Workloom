@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Eye, Link2, Loader2, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { api, asApiError, uploadFile } from '../../lib/api';
 import { useUiStore } from '../../store/ui';
 import { Modal } from '../../components/Modal';
+import { ShareViewsModal } from '../../components/ShareViewsModal';
+import type { ShareLink } from '../../lib/types';
 
 interface PreviewMeta {
   id: string;
@@ -35,8 +37,11 @@ export function HtmlPreviewPage() {
   const [entry, setEntry] = useState('');
   const [loading, setLoading] = useState(true);
   const [shareUrl, setShareUrl] = useState('');
-  const [shareLinks, setShareLinks] = useState<{ id: string; token: string }[]>([]);
+  const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
+  const [linkTrack, setLinkTrack] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [viewsLink, setViewsLink] = useState<ShareLink | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const reuploadRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +64,7 @@ export function HtmlPreviewPage() {
   async function refreshShareLinks() {
     if (!id) return;
     try {
-      const { data } = await api.get<{ list: { id: string; token: string }[] }>('/share', {
+      const { data } = await api.get<{ list: ShareLink[] }>('/share', {
         params: { resourceType: 'html', resourceId: id },
       });
       setShareLinks(data.list);
@@ -68,28 +73,34 @@ export function HtmlPreviewPage() {
     }
   }
 
-  async function handleShare() {
-    if (!id) return;
+  function openShareModal() {
+    setShareOpen(true);
+    refreshShareLinks();
+  }
+
+  async function createShareLink() {
+    if (!id || creating) return;
+    setCreating(true);
     try {
       const { data } = await api.post<{ link: { token: string } }>('/share', {
         resourceType: 'html',
         resourceId: id,
         role: 'view',
-        requireLogin: false,
-        trackViews: false,
+        requireLogin: linkTrack,
+        trackViews: linkTrack,
       });
       setShareUrl(`${window.location.origin}/share/${data.link.token}`);
-      setShareOpen(true);
       refreshShareLinks();
     } catch (err) {
       const resp = (err as { response?: { status?: number; data?: { link?: { token: string } } } }).response;
       if (resp?.status === 409 && resp.data?.link?.token) {
         setShareUrl(`${window.location.origin}/share/${resp.data.link.token}`);
-        setShareOpen(true);
         refreshShareLinks();
       } else {
         showToast(asApiError(err).error, 'error');
       }
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -184,7 +195,7 @@ export function HtmlPreviewPage() {
           </>
         )}
         <button
-          onClick={handleShare}
+          onClick={openShareModal}
           className="flex items-center gap-1 px-3 py-2 rounded-xl bg-liquid-indigo text-white text-sm hover:bg-primary"
         >
           <Share2 size={14} /> 分享
@@ -206,6 +217,27 @@ export function HtmlPreviewPage() {
         <p className="text-sm text-text-secondary mb-3">
           对方打开这个链接就是裸预览，不用登录、没有平台按钮；链接可随时撤销。
         </p>
+        <label className="flex items-center gap-2 mb-2 text-xs text-text-secondary cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={linkTrack}
+            onChange={(e) => setLinkTrack(e.target.checked)}
+            className="accent-liquid-indigo"
+          />
+          记录观看情况（开启后需登录才能打开，并记录每位观看者的打开次数与可见时长）
+        </label>
+        <div className={`text-[11px] mb-2 ${shareLinks.some((l) => l.role === 'view' && l.trackViews === linkTrack) ? 'text-danger' : 'text-text-secondary'}`}>
+          {shareLinks.some((l) => l.role === 'view' && l.trackViews === linkTrack)
+            ? '该组合的链接已存在（见下方列表），如需更换请先撤销旧链接。'
+            : `将创建：仅查看${linkTrack ? ' · 记录观看' : ''}链接（每份资源最多 4 条：查看/编辑 × 记录/不记录）`}
+        </div>
+        <button
+          onClick={() => void createShareLink()}
+          disabled={creating}
+          className="flex items-center gap-1 px-3 h-8 rounded-md bg-liquid-indigo text-white text-xs hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+        >
+          <Link2 size={12} /> 生成链接
+        </button>
         <div className="flex items-center gap-2">
           <input
             value={shareUrl}
@@ -231,9 +263,25 @@ export function HtmlPreviewPage() {
           <div className="mt-4 flex flex-col gap-2">
             {shareLinks.map((l) => (
               <div key={l.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate text-text-secondary">
-                  {window.location.origin}/share/{l.token}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="block truncate text-text-secondary">
+                    {window.location.origin}/share/{l.token}
+                  </span>
+                  {l.trackViews && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-liquid-indigo/10 text-liquid-indigo">
+                      <Eye size={10} /> 记录观看
+                    </span>
+                  )}
+                </div>
+                {l.trackViews && (
+                  <button
+                    onClick={() => setViewsLink(l)}
+                    className="p-1.5 text-text-secondary hover:text-liquid-indigo"
+                    title="观看记录"
+                  >
+                    <Eye size={14} />
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     try {
@@ -253,6 +301,7 @@ export function HtmlPreviewPage() {
             ))}
           </div>
         )}
+        {viewsLink && <ShareViewsModal link={viewsLink} onClose={() => setViewsLink(null)} />}
       </Modal>
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} title="删除 HTML 预览">
