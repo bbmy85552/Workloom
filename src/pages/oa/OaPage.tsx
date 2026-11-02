@@ -22,7 +22,7 @@ export function OaPage() {
     <div className="h-full min-h-0 flex flex-col animate-fade-in-up">
       <header className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-text-primary">OA</h1>
+          <h1 className="text-2xl font-serif font-bold text-text-primary">假期日历</h1>
           <p className="text-sm text-text-secondary truncate">{oaUrl}</p>
         </div>
         <a
@@ -37,7 +37,7 @@ export function OaPage() {
       <div className="flex-1 min-h-0 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
         <iframe
           src={oaUrl}
-          title="OA"
+          title="假期日历"
           className="h-full w-full border-0"
           referrerPolicy="same-origin"
         />

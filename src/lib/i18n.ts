@@ -54,7 +54,7 @@ const exactEn: Record<string, string> = {
   日历: 'Calendar',
   邮箱: 'Mail',
   最近: 'Recent',
-  OA: 'OA',
+  '假期日历': 'Holiday Calendar',
   设置: 'Settings',
   帮助: 'Help',
   管理后台: 'Admin',

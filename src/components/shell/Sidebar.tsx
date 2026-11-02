@@ -8,7 +8,6 @@ import {
   Plus,
   Shield,
   LogOut,
-  Calendar,
   Mail,
   Clock,
   BriefcaseBusiness,
@@ -27,10 +26,9 @@ const navItems = [
   { to: '/app/daily-picks', label: '每日精选', icon: Sparkles },
   { to: '/app/tables', label: '数据表', icon: Table },
   { to: '/app/memory', label: '项目记忆', icon: Brain },
-  { to: '/app/calendar', label: '日历', icon: Calendar },
   { to: '/app/mail', label: '邮箱', icon: Mail },
   { to: '/app/recent', label: '最近', icon: Clock },
-  { to: '/app/oa', label: 'OA', icon: BriefcaseBusiness },
+  { to: '/app/oa', label: '假期日历', icon: BriefcaseBusiness },
   { to: '/app/settings/profile', label: '设置', icon: Settings },
 ];
 
