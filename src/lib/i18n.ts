@@ -759,7 +759,7 @@ const exactEn: Record<string, string> = {
   "搜索内容、标题或标签…": "Search content, title or tags...",
   "添加记忆": "Add Memory",
   "编辑记忆": "Edit Memory",
-  "类型": "Type",
+  '类型': 'Type',
   "标题（可选）": "Title (optional)",
   "内容": "Content",
   "一条记忆只写一件事，例如：数据库使用 SQLite，不引入 Postgres。": "One memory, one thing — e.g. \"The database is SQLite; do not introduce Postgres.\"",
