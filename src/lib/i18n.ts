@@ -1009,6 +1009,7 @@ const exactEn: Record<string, string> = {
   '暂无用户': "No users yet",
   '输入公司名称，按回车或点击别处保存': "Type a company name; press Enter or click elsewhere to save",
   '已读': "Read",
+  '阅读情况': 'Reading',
 };
 
 const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
@@ -1025,14 +1026,17 @@ const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
   [/^(.+) · 累计提交 (\d+)$/, (m) => `${m[1]} · ${m[2]} submissions`],
   [/^(.+) · 累计提交 (\d+) · 已关闭$/, (m) => `${m[1]} · ${m[2]} submissions · Closed`],
   [/^(.+) · 许可证：(.+)$/, (m) => `${translateText(m[1])} · License: ${m[2]}`],
+  [/^共 (\d+) 人 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} users · Page ${m[2]} / ${m[3]}`],
+  [/^共 (\d+) 条 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} logs · Page ${m[2]} / ${m[3]}`],
+  [/^共 (\d+) 篇 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} articles · Page ${m[2]} / ${m[3]}`],
+  [/^共 (\d+) 人 · 已读 (\d+) · 未读 (\d+)$/, (m) => `${m[1]} users · ${m[2]} read · ${m[3]} unread`],
+  [/^第 (\d+) \/ (\d+) 页$/, (m) => `Page ${m[1]} / ${m[2]}`],
   [/^(.+) 页$/, (m) => m[1]],
   [/^登录为 (.+)$/, (m) => `Logged in as ${m[1]}`],
   [/^确认重置 (.+) 的密码？$/, (m) => `Reset the password for ${m[1]}?`],
   [/^(.+) 的新密码$/, (m) => `New password for ${m[1]}`],
   [/^(.+) 的初始密码$/, (m) => `Initial password for ${m[1]}`],
   [/^彻底删除用户 (.+)？该用户的所有数据将一并清除,且不可恢复。$/, (m) => `Permanently delete user ${m[1]}? All data owned by this user will also be removed and cannot be recovered.`],
-  [/^共 (\d+) 人 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} users · Page ${m[2]} / ${m[3]}`],
-  [/^共 (\d+) 条 · 第 (\d+) \/ (\d+) 页$/, (m) => `${m[1]} logs · Page ${m[2]} / ${m[3]}`],
   [/^(.+) · 创建于 (.+)$/, (m) => `${m[1]} · Created at ${m[2]}`],
   [/^(.+) · 分享者 (.+) · 分享于 (.+) · 记录观看$/, (m) => `${translateText(m[1])} · Shared by ${m[2]} · Shared on ${m[3]} · Recorded views`],
   [/^(.+) · 分享者 (.+) · 分享于 (.+)$/, (m) => `${translateText(m[1])} · Shared by ${m[2]} · Shared on ${m[3]}`],

@@ -707,7 +707,8 @@ export const exactHk: Record<string, string> = {
  "人员公司设置": "人員公司設定",
  "暂无用户": "暫無用户",
  "输入公司名称，按回车或点击别处保存": "輸入公司名稱，按回車或點擊別處儲存",
- "已读": "已讀"
+ "已读": "已讀",
+ "阅读情况": "閲讀情況"
 };
 
 export const charHk: Record<string, string> = {
