@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Shield, Users, History, LogOut, UsersRound, Settings, Trash2 } from 'lucide-react';
+import { ChevronLeft, Shield, Users, History, LogOut, UsersRound, Settings, Trash2, BookOpen } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { Toast } from './Toast';
 import { api } from '../../lib/api';
@@ -14,6 +14,7 @@ const items = [
   { to: '/admin/settings', label: '系统设置', icon: Settings },
   { to: '/admin/trash', label: '回收站', icon: Trash2 },
   { to: '/admin/audit', label: '审计日志', icon: History },
+  { to: '/admin/reading', label: '阅读统计', icon: BookOpen },
 ];
 
 export function AdminShell() {

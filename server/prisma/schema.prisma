@@ -12,6 +12,7 @@ model User {
   email           String     @unique
   passwordHash    String
   name            String
+  company         String?
   avatarUrl       String?
   role            String     @default("USER")
   status          String     @default("ACTIVE")

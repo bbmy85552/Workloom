@@ -28,6 +28,7 @@ import { FontsPage } from '../pages/settings/FontsPage';
 import { PreferencesPage } from '../pages/settings/PreferencesPage';
 import { PublicFormPage } from '../pages/forms/PublicFormPage';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
+import { ReadingStatsPage } from '../pages/admin/ReadingStatsPage';
 import { AdminAuditPage } from '../pages/admin/AdminAuditPage';
 import { AdminGroupsPage } from '../pages/admin/AdminGroupsPage';
 import { AdminSettingsPage } from '../pages/admin/AdminSettingsPage';
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'trash', element: <AdminTrashPage /> },
           { path: 'audit', element: <AdminAuditPage /> },
+          { path: 'reading', element: <ReadingStatsPage /> },
         ],
       },
       { path: '/share/:token', element: <SharePage /> },

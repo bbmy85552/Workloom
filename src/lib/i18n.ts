@@ -993,6 +993,22 @@ const exactEn: Record<string, string> = {
   '年假调整': "Annual adjustment",
   '调休调整': "Comp adjustment",
   '请填写加班小时数': "Please fill in the overtime hours",
+  '阅读统计': "Reading stats",
+  '文章列表': "Articles",
+  '还没有记录观看情况的分享链接。': "No share links with recorded views yet.",
+  '查看每篇文章的阅读情况，并为每位用户设置公司。': "View reading stats for each article, and set each user’s company.",
+  '逐人阅读情况': "Reading by person",
+  '只看未读': "Unread only",
+  '未看': "Not read",
+  '公司': "Company",
+  '可见时长': "Visible time",
+  '判定': "Verdict",
+  '创建人': "Creator",
+  '创建日期': "Created date",
+  '人员公司设置': "Company settings",
+  '暂无用户': "No users yet",
+  '输入公司名称，按回车或点击别处保存': "Type a company name; press Enter or click elsewhere to save",
+  '已读': "Read",
 };
 
 const textPatterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [

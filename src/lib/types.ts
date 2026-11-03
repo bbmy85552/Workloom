@@ -244,6 +244,7 @@ export interface AdminUser {
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'DISABLED';
   avatarUrl: string | null;
+  company: string | null;
   lastLoginAt: string | null;
   createdAt: string;
   emailVerifiedAt: string | null;

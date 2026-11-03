@@ -67,6 +67,7 @@ adminRouter.get(
           id: true,
           email: true,
           name: true,
+          company: true,
           role: true,
           status: true,
           avatarUrl: true,
@@ -791,3 +792,195 @@ adminRouter.delete(
     res.json({ ok: true });
   }),
 );
+// 阅读统计（admin-only）：公司内阅读统计页的数据源
+type ReadingLinkRow = {
+  id: string;
+  token: string;
+  resourceType: string;
+  resourceId: string;
+  createdById: string;
+  createdAt: Date;
+  createdBy: { name: string };
+};
+
+// 标题解析：照 dailyPicks.ts 的 resolveTitles 模式（doc/table/html 三类）。
+async function resolveReadingTitles(links: ReadingLinkRow[]) {
+  const docIds = [...new Set(links.filter((l) => l.resourceType === 'doc').map((l) => l.resourceId))];
+  const tableIds = [...new Set(links.filter((l) => l.resourceType === 'table').map((l) => l.resourceId))];
+  const htmlIds = [...new Set(links.filter((l) => l.resourceType === 'html').map((l) => l.resourceId))];
+  const docs = docIds.length
+    ? await prisma.document.findMany({
+        where: { id: { in: docIds }, deletedAt: null },
+        select: { id: true, title: true },
+      })
+    : [];
+  const tables = tableIds.length
+    ? await prisma.tableBase.findMany({
+        where: { id: { in: tableIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const htmls = htmlIds.length
+    ? await prisma.htmlPreview.findMany({
+        where: { id: { in: htmlIds }, deletedAt: null },
+        select: { id: true, title: true },
+      })
+    : [];
+  const map = new Map<string, string>();
+  for (const d of docs) map.set(`doc:${d.id}`, d.title);
+  for (const t of tables) map.set(`table:${t.id}`, t.name);
+  for (const h of htmls) map.set(`html:${h.id}`, h.title);
+  return map;
+}
+
+adminRouter.patch(
+  '/users/:id/company',
+  asyncHandler(async (req, res) => {
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) throw new HttpError(404, '用户不存在', 'NOT_FOUND');
+    const body = z
+      .object({ company: z.string().trim().max(100).nullable() })
+      .parse(req.body);
+    const company = body.company === '' ? null : body.company;
+    const user = await prisma.user.update({
+      where: { id: target.id },
+      data: { company },
+      select: { id: true, email: true, name: true, role: true, status: true, company: true },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'UPDATE_USER_COMPANY',
+        target: target.id,
+        metaJson: JSON.stringify({ company }),
+      },
+    });
+    res.json({ user });
+  }),
+);
+
+adminRouter.get(
+  '/reading/links',
+  asyncHandler(async (req, res) => {
+    const links = await prisma.shareLink.findMany({
+      where: { trackViews: true, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: { createdBy: { select: { name: true } } },
+    });
+    const titles = await resolveReadingTitles(links);
+    const totalUsers = await prisma.user.count();
+    const readerRows = links.length
+      ? await prisma.shareViewSession.groupBy({
+          by: ['linkId', 'userId'],
+          where: { linkId: { in: links.map((l) => l.id) } },
+        })
+      : [];
+    const readersByLink = new Map<string, number>();
+    for (const r of readerRows) {
+      readersByLink.set(r.linkId, (readersByLink.get(r.linkId) ?? 0) + 1);
+    }
+    const list = links
+      .filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`))
+      .map((l) => ({
+        id: l.id,
+        token: l.token,
+        resourceType: l.resourceType,
+        resourceId: l.resourceId,
+        title: titles.get(`${l.resourceType}:${l.resourceId}`)!,
+        creatorName: l.createdBy.name,
+        createdAt: l.createdAt,
+        readers: readersByLink.get(l.id) ?? 0,
+        totalUsers,
+      }));
+    res.json({ list });
+  }),
+);
+
+adminRouter.get(
+  '/reading/:linkId',
+  asyncHandler(async (req, res) => {
+    const link = await prisma.shareLink.findUnique({
+      where: { id: req.params.linkId },
+      include: { createdBy: { select: { name: true } } },
+    });
+    if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
+    const titles = await resolveReadingTitles([link]);
+    const title = titles.get(`${link.resourceType}:${link.resourceId}`) ?? '';
+    const sessions = await prisma.shareViewSession.findMany({
+      where: { linkId: link.id },
+      orderBy: { startedAt: 'desc' },
+      take: 300,
+    });
+    type Agg = {
+      visits: number;
+      visibleSec: number;
+      activeSec: number;
+      scrollSec: number;
+      maxScrollDepth: number;
+      lastSeenAt: Date;
+    };
+    const byUserMap = new Map<string, Agg>();
+    for (const s of sessions) {
+      const cur = byUserMap.get(s.userId);
+      if (!cur) {
+        byUserMap.set(s.userId, {
+          visits: 1,
+          visibleSec: s.visibleSec,
+          activeSec: s.activeSec,
+          scrollSec: s.scrollSec,
+          maxScrollDepth: s.maxScrollDepth,
+          lastSeenAt: s.lastSeenAt,
+        });
+      } else {
+        cur.visits += 1;
+        cur.visibleSec += s.visibleSec;
+        cur.activeSec += s.activeSec;
+        cur.scrollSec += s.scrollSec;
+        cur.maxScrollDepth = Math.max(cur.maxScrollDepth, s.maxScrollDepth);
+        if (s.lastSeenAt > cur.lastSeenAt) cur.lastSeenAt = s.lastSeenAt;
+      }
+    }
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, company: true },
+    });
+    users.sort((a, b) => {
+      if (a.company === null && b.company !== null) return 1;
+      if (a.company !== null && b.company === null) return -1;
+      if (a.company !== null && b.company !== null && a.company !== b.company) {
+        return a.company.localeCompare(b.company);
+      }
+      return a.name.localeCompare(b.name);
+    });
+    res.json({
+      link: {
+        id: link.id,
+        token: link.token,
+        resourceType: link.resourceType,
+        resourceId: link.resourceId,
+        title,
+        creatorName: link.createdBy.name,
+        createdAt: link.createdAt,
+      },
+      users: users.map((u) => {
+        const agg = byUserMap.get(u.id);
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          company: u.company,
+          agg: agg
+            ? {
+                visits: agg.visits,
+                visibleSec: agg.visibleSec,
+                activeSec: agg.activeSec,
+                scrollSec: agg.scrollSec,
+                maxScrollDepth: agg.maxScrollDepth,
+                lastSeenAt: agg.lastSeenAt.toISOString(),
+              }
+            : null,
+        };
+      }),
+    });
+  }),
+);
+
