@@ -616,3 +616,85 @@ model HtmlPreview {
   deletedAt DateTime?
   deletedById String?
 }
+
+// 2dqy-oa 假期管理移植（m21）：日期一律 TEXT 'YYYY-MM-DD'，数字一律 Decimal。
+model OaEmployee {
+  id               Int              @id @default(autoincrement())
+  name             String           @unique
+  hireDate         String?
+  annualAdjustment Decimal          @default(0)
+  compAdjustment   Decimal          @default(0)
+  createdAt        DateTime         @default(now())
+  leaveRecords     OaLeaveRecord[]
+  overtimeRecords  OaOvertimeRecord[]
+  memos            OaMemo[]
+
+  @@map("oa_employees")
+}
+
+model OaHoliday {
+  id        Int      @id @default(autoincrement())
+  date      String
+  region    String
+  name      String
+  isWorkday Boolean  @default(false)
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
+
+  @@unique([date, region])
+  @@map("oa_holidays")
+}
+
+model OaLeaveRecord {
+  id         Int        @id @default(autoincrement())
+  employeeId Int
+  employee   OaEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       String
+  unit       String     @default("full")
+  startDate  String
+  endDate    String
+  days       Decimal
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([employeeId])
+  @@map("oa_leave_records")
+}
+
+model OaOvertimeRecord {
+  id         Int        @id @default(autoincrement())
+  employeeId Int
+  employee   OaEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  workDate   String
+  hours      Decimal
+  days       Decimal
+  createdAt  DateTime   @default(now())
+
+  @@index([employeeId])
+  @@map("oa_overtime_records")
+}
+
+model OaMemo {
+  id         Int        @id @default(autoincrement())
+  employeeId Int
+  employee   OaEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  memoDate   String
+  content    String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([employeeId])
+  @@map("oa_memos")
+}
+
+model OaOperationLog {
+  id         Int      @id @default(autoincrement())
+  operator   String   @default("人事管理员")
+  action     String
+  targetType String
+  targetId   Int?
+  detail     String
+  createdAt  DateTime @default(now())
+
+  @@map("oa_operation_logs")
+}
