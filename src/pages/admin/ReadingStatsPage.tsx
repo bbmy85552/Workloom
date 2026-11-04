@@ -54,6 +54,14 @@ interface UsersPage {
   pageSize: number;
 }
 
+interface ByCompanyRow {
+  company: string | null;
+  accountCount: number;
+  readCount: number;
+  totalLinks: number;
+  percentage: number;
+}
+
 function typeLabel(resourceType: string): string {
   if (resourceType === 'table') return '数据表';
   if (resourceType === 'html') return 'HTML';
@@ -97,7 +105,7 @@ function Pager({
 
 export function ReadingStatsPage() {
   const showToast = useUiStore((s) => s.showToast);
-  const [tab, setTab] = useState<'reading' | 'companies'>('reading');
+  const [tab, setTab] = useState<'reading' | 'companies' | 'summary'>('reading');
   const [links, setLinks] = useState<ReadingLink[]>([]);
   const [linksLoaded, setLinksLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -110,6 +118,9 @@ export function ReadingStatsPage() {
   const [linksPage, setLinksPage] = useState(1);
   const [detailPage, setDetailPage] = useState(1);
   const [usersPage, setUsersPage] = useState(1);
+  const [byCompany, setByCompany] = useState<ByCompanyRow[]>([]);
+  const [byCompanyLoaded, setByCompanyLoaded] = useState(false);
+  const [byCompanyPage, setByCompanyPage] = useState(1);
 
   useEffect(() => {
     (async () => {
@@ -161,6 +172,22 @@ export function ReadingStatsPage() {
     })();
   }, [showToast]);
 
+  useEffect(() => {
+    if (tab !== 'summary') return;
+    setByCompanyLoaded(false);
+    setByCompanyPage(1);
+    (async () => {
+      try {
+        const { data } = await api.get<{ list: ByCompanyRow[] }>('/admin/reading/by-company');
+        setByCompany(data.list);
+      } catch (err) {
+        showToast(asApiError(err).error, 'error');
+      } finally {
+        setByCompanyLoaded(true);
+      }
+    })();
+  }, [tab, showToast]);
+
   const selectedLink = links.find((l) => l.id === selectedId) ?? null;
   const isHtml = detail
     ? detail.link.resourceType === 'html'
@@ -199,6 +226,14 @@ export function ReadingStatsPage() {
   const usersPageSafe = Math.min(usersPage, usersTotalPages);
   const pageUsers = users.slice((usersPageSafe - 1) * PAGE_SIZE, usersPageSafe * PAGE_SIZE);
 
+  const byCompanyTotalPages = Math.max(1, Math.ceil(byCompany.length / PAGE_SIZE));
+  const byCompanyPageSafe = Math.min(byCompanyPage, byCompanyTotalPages);
+  const pageByCompany = byCompany.slice(
+    (byCompanyPageSafe - 1) * PAGE_SIZE,
+    byCompanyPageSafe * PAGE_SIZE,
+  );
+  const hasTrackedLinks = byCompany.some((r) => r.totalLinks > 0);
+
   const saveCompany = async (u: AdminUser) => {
     const draft = drafts[u.id] ?? '';
     const next = draft.trim() ? draft.trim() : null;
@@ -224,7 +259,7 @@ export function ReadingStatsPage() {
       <header className="shrink-0 mb-3">
         <h1 className="text-3xl font-serif font-bold text-text-primary">阅读统计</h1>
         <p className="text-text-secondary text-sm mt-1">
-          查看每篇文章的阅读情况，并为每位用户设置公司。
+          查看每篇文章的阅读情况，并为每位用户设置公司名。
         </p>
       </header>
 
@@ -254,6 +289,19 @@ export function ReadingStatsPage() {
           }`}
         >
           人员公司设置
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'summary'}
+          onClick={() => setTab('summary')}
+          className={`px-3 py-2 text-sm -mb-px border-b-2 transition-colors ${
+            tab === 'summary'
+              ? 'border-liquid-indigo text-liquid-indigo font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          公司汇总
         </button>
       </div>
 
@@ -330,7 +378,7 @@ export function ReadingStatsPage() {
                         setDetailPage(1);
                       }}
                       className="h-8 px-2 text-sm rounded-md border border-black/10 bg-white"
-                      aria-label="公司"
+                      aria-label="公司名"
                     >
                       <option value="全部">全部</option>
                       {companies.map((c) => (
@@ -367,8 +415,7 @@ export function ReadingStatsPage() {
                 <table className="min-w-full text-sm">
                   <thead className="text-left text-xs uppercase text-text-secondary border-b border-black/5">
                     <tr>
-                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">姓名</th>
-                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">公司</th>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">公司名</th>
                       <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">打开次数</th>
                       <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">可见时长</th>
                       {!isHtml && <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">活跃时长</th>}
@@ -384,16 +431,14 @@ export function ReadingStatsPage() {
                       return (
                         <tr key={u.id} className="border-b border-black/5 hover:bg-black/[0.02]">
                           <td className="px-4 py-2">
-                            <div className="font-medium text-text-primary text-sm">{u.name}</div>
-                            <div className="text-xs text-text-secondary">{u.email}</div>
+                            <div className="font-medium text-text-primary text-sm">
+                              {u.company ?? '未设置'}
+                            </div>
                             {isHtml && !u.agg && (
                               <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-black/5 text-text-secondary text-xs">
                                 未看
                               </span>
                             )}
-                          </td>
-                          <td className="px-4 py-2 text-xs text-text-secondary">
-                            {u.company ?? '—'}
                           </td>
                           <td className="px-4 py-2">{u.agg ? u.agg.visits : '—'}</td>
                           <td className="px-4 py-2">
@@ -436,7 +481,7 @@ export function ReadingStatsPage() {
                     {filteredUsers.length === 0 && (
                       <tr>
                         <td
-                          colSpan={isHtml ? 5 : 9}
+                          colSpan={isHtml ? 4 : 8}
                           className="py-10 text-center text-sm text-text-secondary"
                         >
                           暂无用户
@@ -458,26 +503,24 @@ export function ReadingStatsPage() {
             )}
           </section>
         </div>
-      ) : (
+      ) : tab === 'companies' ? (
         <div className="flex-1 min-h-0 flex flex-col">
           <section className="glass-panel rounded-2xl overflow-hidden flex flex-col min-h-0 flex-1">
             <div className="shrink-0 px-4 py-3 border-b border-black/5 text-sm text-text-secondary">
-              输入公司名称，按回车或点击别处保存
+              输入公司名，按回车或点击别处保存
             </div>
             <div className="flex-1 min-h-0 overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="text-left text-xs uppercase text-text-secondary border-b border-black/5">
                   <tr>
-                    <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">姓名</th>
                     <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">邮箱</th>
                     <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">角色</th>
-                    <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">公司</th>
+                    <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">公司名</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageUsers.map((u) => (
                     <tr key={u.id} className="border-b border-black/5 hover:bg-black/[0.02]">
-                      <td className="px-4 py-2 font-medium text-text-primary text-sm">{u.name}</td>
                       <td className="px-4 py-2 text-xs text-text-secondary">{u.email}</td>
                       <td className="px-4 py-2 text-xs">
                         {u.role === 'ADMIN' ? '管理员' : '普通用户'}
@@ -499,7 +542,7 @@ export function ReadingStatsPage() {
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-10 text-center text-sm text-text-secondary">
+                      <td colSpan={3} className="py-10 text-center text-sm text-text-secondary">
                         暂无用户
                       </td>
                     </tr>
@@ -510,6 +553,69 @@ export function ReadingStatsPage() {
             <div className="shrink-0 flex items-center justify-between px-4 py-3 text-xs text-text-secondary border-t border-black/5">
               <span>{`共 ${users.length} 人 · 第 ${usersPageSafe} / ${usersTotalPages} 页`}</span>
               <Pager page={usersPageSafe} totalPages={usersTotalPages} onPage={setUsersPage} />
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <section className="glass-panel rounded-2xl overflow-hidden flex flex-col min-h-0 flex-1">
+            <div className="shrink-0 px-4 py-3 border-b border-black/5 text-sm font-semibold text-text-primary">
+              公司汇总
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto">
+              {!byCompanyLoaded && (
+                <div className="py-10 text-center text-sm text-text-secondary">加载中…</div>
+              )}
+              {byCompanyLoaded && !hasTrackedLinks && (
+                <div className="py-10 text-center text-sm text-text-secondary">
+                  还没有记录观看情况的分享链接。
+                </div>
+              )}
+              {byCompanyLoaded && hasTrackedLinks && (
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs uppercase text-text-secondary border-b border-black/5">
+                    <tr>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">公司名</th>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">账号数</th>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">已读文章</th>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">总文章</th>
+                      <th className="px-4 py-2 sticky top-0 z-10 bg-surface-container-lowest">阅读率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageByCompany.map((row) => (
+                      <tr
+                        key={row.company ?? '__unset__'}
+                        className="border-b border-black/5 hover:bg-black/[0.02]"
+                      >
+                        <td className="px-4 py-2 font-medium text-text-primary text-sm">
+                          {row.company ?? '未设置'}
+                        </td>
+                        <td className="px-4 py-2">{row.accountCount}</td>
+                        <td className="px-4 py-2">{row.readCount}</td>
+                        <td className="px-4 py-2">{row.totalLinks}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-24 rounded-full bg-black/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-liquid-indigo"
+                                style={{ width: `${row.percentage}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-text-secondary whitespace-nowrap">
+                              {`${row.percentage.toFixed(1)}%`}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 text-xs text-text-secondary border-t border-black/5">
+              <span>{`共 ${byCompany.length} 条 · 第 ${byCompanyPageSafe} / ${byCompanyTotalPages} 页`}</span>
+              <Pager page={byCompanyPageSafe} totalPages={byCompanyTotalPages} onPage={setByCompanyPage} />
             </div>
           </section>
         </div>

@@ -897,6 +897,55 @@ adminRouter.get(
 );
 
 adminRouter.get(
+  '/reading/by-company',
+  asyncHandler(async (_req, res) => {
+    const links = await prisma.shareLink.findMany({
+      where: { trackViews: true, revokedAt: null },
+      select: { id: true },
+    });
+    const totalLinks = links.length;
+    const users = await prisma.user.findMany({
+      select: { id: true, company: true },
+    });
+    const accountCountByCompany = new Map<string | null, number>();
+    const readLinkIdsByCompany = new Map<string | null, Set<string>>();
+    for (const u of users) {
+      accountCountByCompany.set(u.company, (accountCountByCompany.get(u.company) ?? 0) + 1);
+      if (!readLinkIdsByCompany.has(u.company)) {
+        readLinkIdsByCompany.set(u.company, new Set());
+      }
+    }
+    if (totalLinks > 0) {
+      const sessionRows = await prisma.shareViewSession.groupBy({
+        by: ['linkId', 'userId'],
+        where: { linkId: { in: links.map((l) => l.id) } },
+      });
+      const companyByUserId = new Map(users.map((u) => [u.id, u.company]));
+      for (const row of sessionRows) {
+        const company = companyByUserId.get(row.userId);
+        if (company === undefined) continue;
+        readLinkIdsByCompany.get(company)!.add(row.linkId);
+      }
+    }
+    const list = [...accountCountByCompany.entries()].map(([company, accountCount]) => {
+      const readCount = readLinkIdsByCompany.get(company)?.size ?? 0;
+      const percentage = totalLinks === 0 ? 0 : Math.round((readCount / totalLinks) * 1000) / 10;
+      return { company, accountCount, readCount, totalLinks, percentage };
+    });
+    list.sort((a, b) => {
+      if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+      if (a.company === null && b.company !== null) return 1;
+      if (a.company !== null && b.company === null) return -1;
+      if (a.company !== null && b.company !== null && a.company !== b.company) {
+        return a.company.localeCompare(b.company);
+      }
+      return 0;
+    });
+    res.json({ list });
+  }),
+);
+
+adminRouter.get(
   '/reading/:linkId',
   asyncHandler(async (req, res) => {
     const link = await prisma.shareLink.findUnique({
