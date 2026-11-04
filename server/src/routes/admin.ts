@@ -793,18 +793,8 @@ adminRouter.delete(
   }),
 );
 // 阅读统计（admin-only）：公司内阅读统计页的数据源
-type ReadingLinkRow = {
-  id: string;
-  token: string;
-  resourceType: string;
-  resourceId: string;
-  createdById: string;
-  createdAt: Date;
-  createdBy: { name: string };
-};
-
 // 标题解析：照 dailyPicks.ts 的 resolveTitles 模式（doc/table/html 三类）。
-async function resolveReadingTitles(links: ReadingLinkRow[]) {
+async function resolveReadingTitles(links: Array<{ resourceType: string; resourceId: string }>) {
   const docIds = [...new Set(links.filter((l) => l.resourceType === 'doc').map((l) => l.resourceId))];
   const tableIds = [...new Set(links.filter((l) => l.resourceType === 'table').map((l) => l.resourceId))];
   const htmlIds = [...new Set(links.filter((l) => l.resourceType === 'html').map((l) => l.resourceId))];
@@ -901,9 +891,11 @@ adminRouter.get(
   asyncHandler(async (_req, res) => {
     const links = await prisma.shareLink.findMany({
       where: { trackViews: true, revokedAt: null },
-      select: { id: true },
+      select: { id: true, resourceType: true, resourceId: true },
     });
-    const totalLinks = links.length;
+    const titles = await resolveReadingTitles(links);
+    const liveLinks = links.filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`));
+    const totalLinks = liveLinks.length;
     const users = await prisma.user.findMany({
       select: { id: true, company: true },
     });
@@ -918,7 +910,7 @@ adminRouter.get(
     if (totalLinks > 0) {
       const sessionRows = await prisma.shareViewSession.groupBy({
         by: ['linkId', 'userId'],
-        where: { linkId: { in: links.map((l) => l.id) } },
+        where: { linkId: { in: liveLinks.map((l) => l.id) } },
       });
       const companyByUserId = new Map(users.map((u) => [u.id, u.company]));
       for (const row of sessionRows) {
