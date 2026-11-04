@@ -889,12 +889,25 @@ adminRouter.get(
 adminRouter.get(
   '/reading/by-company',
   asyncHandler(async (_req, res) => {
-    const links = await prisma.shareLink.findMany({
-      where: { trackViews: true, revokedAt: null },
-      select: { id: true, resourceType: true, resourceId: true },
+    // 分母口径：只算每日精选时间线里实际放出来的文章（有 DailyPick 行、
+    // 且通过时间线自身的 isLinkActive 检查、且资源仍可解析）。
+    const picks = await prisma.dailyPick.findMany({
+      select: { shareLinkId: true },
     });
-    const titles = await resolveReadingTitles(links);
-    const liveLinks = links.filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`));
+    const pickLinkIds = [...new Set(picks.map((p) => p.shareLinkId))];
+    const links = await prisma.shareLink.findMany({
+      where: { id: { in: pickLinkIds }, trackViews: true, revokedAt: null },
+      select: { id: true, resourceType: true, resourceId: true, role: true, expiresAt: true },
+    });
+    const now = new Date();
+    const active = links.filter(
+      (l) =>
+        l.role === 'view' &&
+        (l.resourceType === 'doc' || l.resourceType === 'table' || l.resourceType === 'html') &&
+        (!l.expiresAt || l.expiresAt > now),
+    );
+    const titles = await resolveReadingTitles(active);
+    const liveLinks = active.filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`));
     const totalLinks = liveLinks.length;
     const users = await prisma.user.findMany({
       select: { id: true, company: true },
