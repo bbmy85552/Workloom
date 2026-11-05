@@ -169,13 +169,25 @@ shareRouter.get(
 
 // 公共知识库文档默认人人可编辑（见 docAccess 的 publicDefaultWrite），分享链接同步开放：
 // 在公共文档上有写权限的人也可创建分享链接；被作者明确设为「仅查看」的人不行。
+// HTML 与文档对齐：公共空间的 HTML 没有逐人权限行，等价于 permissions 为空的文档，
+// 任何登录用户都可创建分享链接（管理员自然包含在内）；私密空间的 HTML 仍只限所有者/创建者。
 function canSharePublicDoc(
   user: { id: string; role: string },
   res: Awaited<ReturnType<typeof loadResource>>,
 ): boolean {
-  if (res.kind !== 'doc') return false;
-  const access = computeAccess(user, res.doc, { publicDefaultWrite: true });
-  return access.isPublic && access.canWrite;
+  if (res.kind === 'doc') {
+    const access = computeAccess(user, res.doc, { publicDefaultWrite: true });
+    return access.isPublic && access.canWrite;
+  }
+  if (res.kind === 'html') {
+    const access = computeAccess(
+      user,
+      { createdById: res.html.createdById, workspace: res.html.workspace, permissions: [] },
+      { publicDefaultWrite: true },
+    );
+    return access.isPublic && access.canWrite;
+  }
+  return false;
 }
 
 // 分享页评论：凭链接 token 查看（公开）/发表（需登录），与正文共用同一道 token 校验。

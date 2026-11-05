@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Eye, Link2, Loader2, RefreshCw, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Eye, Link2, Loader2, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { api, asApiError, uploadFile } from '../../lib/api';
 import { useUiStore } from '../../store/ui';
 import { Modal } from '../../components/Modal';
@@ -283,6 +283,20 @@ export function HtmlPreviewPage() {
                     <Eye size={14} />
                   </button>
                 )}
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(`${window.location.origin}/share/${l.token}`);
+                      showToast('链接已复制', 'success');
+                    } catch {
+                      showToast('复制失败，请手动复制', 'error');
+                    }
+                  }}
+                  className="p-1.5 text-text-secondary hover:text-liquid-indigo"
+                  title="复制"
+                >
+                  <Copy size={14} />
+                </button>
                 <button
                   onClick={async () => {
                     try {
