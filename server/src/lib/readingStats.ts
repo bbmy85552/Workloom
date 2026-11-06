@@ -151,10 +151,12 @@ export interface ReadingUser {
   company: string | null;
 }
 
-// 照 /reading/:linkId 原样抽出：全部用户，公司名排序（未设置排最后），再按姓名。
+// 全部用户，公司名排序（未设置排最后），同公司按邮箱排。
+// 对外显示的 name 用公司名（与管理后台阅读统计页一致：company ?? '未设置'），
+// 平台用户名跟 Google 账号走、认不出人，不再外露；email 仍保留，供同公司多账号区分。
 export async function listReadingUsers(): Promise<ReadingUser[]> {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, company: true },
+    select: { id: true, email: true, company: true },
   });
   users.sort((a, b) => {
     if (a.company === null && b.company !== null) return 1;
@@ -162,9 +164,9 @@ export async function listReadingUsers(): Promise<ReadingUser[]> {
     if (a.company !== null && b.company !== null && a.company !== b.company) {
       return a.company.localeCompare(b.company);
     }
-    return a.name.localeCompare(b.name);
+    return a.email.localeCompare(b.email);
   });
-  return users;
+  return users.map((u) => ({ id: u.id, name: u.company ?? '未设置', email: u.email, company: u.company }));
 }
 
 export function assertReadingAdmin(user: { role: string }): void {
