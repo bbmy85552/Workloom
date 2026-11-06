@@ -11,6 +11,12 @@ import { getMailBrandName } from '../lib/systemSettings.js';
 import { createBackupPayload, createMigrationPayload, restoreBackupPayload, restoreMigrationPayload } from '../lib/backup.js';
 import { contentDispositionAttachment } from '../lib/filename.js';
 import { env } from '../env.js';
+import {
+  aggregateSessionsByUser,
+  getLiveTimelineLinks,
+  listReadingUsers,
+  resolveReadingTitles,
+} from '../lib/readingStats.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -792,36 +798,6 @@ adminRouter.delete(
     res.json({ ok: true });
   }),
 );
-// 阅读统计（admin-only）：公司内阅读统计页的数据源
-// 标题解析：照 dailyPicks.ts 的 resolveTitles 模式（doc/table/html 三类）。
-async function resolveReadingTitles(links: Array<{ resourceType: string; resourceId: string }>) {
-  const docIds = [...new Set(links.filter((l) => l.resourceType === 'doc').map((l) => l.resourceId))];
-  const tableIds = [...new Set(links.filter((l) => l.resourceType === 'table').map((l) => l.resourceId))];
-  const htmlIds = [...new Set(links.filter((l) => l.resourceType === 'html').map((l) => l.resourceId))];
-  const docs = docIds.length
-    ? await prisma.document.findMany({
-        where: { id: { in: docIds }, deletedAt: null },
-        select: { id: true, title: true },
-      })
-    : [];
-  const tables = tableIds.length
-    ? await prisma.tableBase.findMany({
-        where: { id: { in: tableIds } },
-        select: { id: true, name: true },
-      })
-    : [];
-  const htmls = htmlIds.length
-    ? await prisma.htmlPreview.findMany({
-        where: { id: { in: htmlIds }, deletedAt: null },
-        select: { id: true, title: true },
-      })
-    : [];
-  const map = new Map<string, string>();
-  for (const d of docs) map.set(`doc:${d.id}`, d.title);
-  for (const t of tables) map.set(`table:${t.id}`, t.name);
-  for (const h of htmls) map.set(`html:${h.id}`, h.title);
-  return map;
-}
 
 adminRouter.patch(
   '/users/:id/company',
@@ -889,25 +865,8 @@ adminRouter.get(
 adminRouter.get(
   '/reading/by-company',
   asyncHandler(async (_req, res) => {
-    // 分母口径：只算每日精选时间线里实际放出来的文章（有 DailyPick 行、
-    // 且通过时间线自身的 isLinkActive 检查、且资源仍可解析）。
-    const picks = await prisma.dailyPick.findMany({
-      select: { shareLinkId: true },
-    });
-    const pickLinkIds = [...new Set(picks.map((p) => p.shareLinkId))];
-    const links = await prisma.shareLink.findMany({
-      where: { id: { in: pickLinkIds }, trackViews: true, revokedAt: null },
-      select: { id: true, resourceType: true, resourceId: true, role: true, expiresAt: true },
-    });
-    const now = new Date();
-    const active = links.filter(
-      (l) =>
-        l.role === 'view' &&
-        (l.resourceType === 'doc' || l.resourceType === 'table' || l.resourceType === 'html') &&
-        (!l.expiresAt || l.expiresAt > now),
-    );
-    const titles = await resolveReadingTitles(active);
-    const liveLinks = active.filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`));
+    // 分母口径见 lib/readingStats.getLiveTimelineLinks：只算每日精选时间线里实际放出来的文章。
+    const liveLinks = await getLiveTimelineLinks();
     const totalLinks = liveLinks.length;
     const users = await prisma.user.findMany({
       select: { id: true, company: true },
@@ -960,51 +919,8 @@ adminRouter.get(
     if (!link) throw new HttpError(404, '分享链接不存在', 'NOT_FOUND');
     const titles = await resolveReadingTitles([link]);
     const title = titles.get(`${link.resourceType}:${link.resourceId}`) ?? '';
-    const sessions = await prisma.shareViewSession.findMany({
-      where: { linkId: link.id },
-      orderBy: { startedAt: 'desc' },
-      take: 300,
-    });
-    type Agg = {
-      visits: number;
-      visibleSec: number;
-      activeSec: number;
-      scrollSec: number;
-      maxScrollDepth: number;
-      lastSeenAt: Date;
-    };
-    const byUserMap = new Map<string, Agg>();
-    for (const s of sessions) {
-      const cur = byUserMap.get(s.userId);
-      if (!cur) {
-        byUserMap.set(s.userId, {
-          visits: 1,
-          visibleSec: s.visibleSec,
-          activeSec: s.activeSec,
-          scrollSec: s.scrollSec,
-          maxScrollDepth: s.maxScrollDepth,
-          lastSeenAt: s.lastSeenAt,
-        });
-      } else {
-        cur.visits += 1;
-        cur.visibleSec += s.visibleSec;
-        cur.activeSec += s.activeSec;
-        cur.scrollSec += s.scrollSec;
-        cur.maxScrollDepth = Math.max(cur.maxScrollDepth, s.maxScrollDepth);
-        if (s.lastSeenAt > cur.lastSeenAt) cur.lastSeenAt = s.lastSeenAt;
-      }
-    }
-    const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, company: true },
-    });
-    users.sort((a, b) => {
-      if (a.company === null && b.company !== null) return 1;
-      if (a.company !== null && b.company === null) return -1;
-      if (a.company !== null && b.company !== null && a.company !== b.company) {
-        return a.company.localeCompare(b.company);
-      }
-      return a.name.localeCompare(b.name);
-    });
+    const byUserMap = await aggregateSessionsByUser([link.id]);
+    const users = await listReadingUsers();
     res.json({
       link: {
         id: link.id,

@@ -5,6 +5,14 @@ import type { AuthedUser } from '../middleware/auth.js';
 import { computeAccess, loadDocWithAccess } from '../lib/docAccess.js';
 import { HttpError } from '../lib/asyncHandler.js';
 import { MEMORY_MCP_INSTRUCTIONS, registerMemoryTools } from './memoryTools.js';
+import {
+  aggregateSessionsByUser,
+  assertReadingAdmin,
+  countReadLinksByUser,
+  getLiveTimelineLinks,
+  listReadingUsers,
+} from '../lib/readingStats.js';
+import type { LiveTimelineLink, SessionAgg } from '../lib/readingStats.js';
 
 const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
 const FIELD_TYPES = [
@@ -518,6 +526,115 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
       await assertRecordInTable(ctx.table.id, recordId);
       await prisma.tableRecord.delete({ where: { id: recordId } });
       return jsonContent({ ok: true });
+    },
+  );
+
+  server.registerTool(
+    'reading_article_status',
+    {
+      title: 'Daily Picks Article Read Status',
+      description:
+        'Admin only. For one Daily Picks article (by title keyword or share link id), list who has read it and who has not. Read means the user opened the link at least once. Only articles actually featured on the Daily Picks timeline are considered.',
+      inputSchema: {
+        article: z.string().trim().min(1).max(200),
+      },
+    },
+    async ({ article }) => {
+      assertReadingAdmin(user);
+      const links = await getLiveTimelineLinks();
+      const keyword = article.toLowerCase();
+      let target: LiveTimelineLink | undefined = links.find((l) => l.id === article);
+      if (!target) {
+        const exact = links.filter((l) => l.title.trim().toLowerCase() === keyword);
+        if (exact.length === 1) {
+          target = exact[0];
+        } else {
+          const matched = exact.length > 1 ? exact : links.filter((l) => l.title.toLowerCase().includes(keyword));
+          if (matched.length === 0) {
+            return jsonContent({
+              error: 'NOT_FOUND',
+              message: `没有找到标题包含「${article}」的每日精选文章`,
+              liveArticles: links.map((l) => ({ linkId: l.id, title: l.title, resourceType: l.resourceType })),
+            });
+          }
+          if (matched.length > 1) {
+            return jsonContent({
+              error: 'AMBIGUOUS',
+              message: `标题包含「${article}」的每日精选文章有 ${matched.length} 篇，请用 linkId 指定一篇`,
+              candidates: matched.map((l) => ({ linkId: l.id, title: l.title, resourceType: l.resourceType })),
+            });
+          }
+          target = matched[0];
+        }
+      }
+      if (!target) throw new HttpError(404, '没有找到对应的每日精选文章', 'NOT_FOUND');
+      const users = await listReadingUsers();
+      const aggByUser = await aggregateSessionsByUser([target.id]);
+      const toAggJson = (agg: SessionAgg) => ({
+        visits: agg.visits,
+        visibleSec: agg.visibleSec,
+        activeSec: agg.activeSec,
+        scrollSec: agg.scrollSec,
+        maxScrollDepth: agg.maxScrollDepth,
+        lastSeenAt: agg.lastSeenAt.toISOString(),
+      });
+      const read = users
+        .filter((u) => aggByUser.has(u.id))
+        .map((u) => ({ id: u.id, name: u.name, company: u.company, email: u.email, agg: toAggJson(aggByUser.get(u.id)!) }));
+      const unread = users
+        .filter((u) => !aggByUser.has(u.id))
+        .map((u) => ({ id: u.id, name: u.name, company: u.company, email: u.email, agg: null }));
+      return jsonContent({
+        article: {
+          id: target.id,
+          title: target.title,
+          resourceType: target.resourceType,
+          createdAt: target.createdAt.toISOString(),
+          creatorName: target.creatorName,
+        },
+        totalUsers: users.length,
+        readCount: read.length,
+        unreadCount: unread.length,
+        read,
+        unread,
+      });
+    },
+  );
+
+  server.registerTool(
+    'reading_user_completion',
+    {
+      title: 'Daily Picks Reading Completion by User',
+      description:
+        'Admin only. For every user, the share of featured Daily Picks articles they have opened (read means at least one view session on the article link). Denominator: only articles actually featured on the Daily Picks timeline. Optional company filters by company name.',
+      inputSchema: {
+        company: z.string().trim().max(100).optional(),
+      },
+    },
+    async ({ company }) => {
+      assertReadingAdmin(user);
+      const links = await getLiveTimelineLinks();
+      const totalLinks = links.length;
+      const users = await listReadingUsers();
+      const filtered = company ? users.filter((u) => u.company === company) : users;
+      const readCounts = await countReadLinksByUser(links.map((l) => l.id));
+      const rows = filtered
+        .map((u) => {
+          const readCount = readCounts.get(u.id) ?? 0;
+          const percentage = totalLinks === 0 ? 0 : Math.round((readCount / totalLinks) * 1000) / 10;
+          return { name: u.name, company: u.company, email: u.email, readCount, totalLinks, percentage };
+        })
+        .sort((a, b) => {
+          if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+          return a.name.localeCompare(b.name);
+        });
+      return jsonContent({
+        denominator: {
+          totalLinks,
+          note: '只算每日精选时间线里实际放出的文章（已撤销、过期或未进时间线的链接不计）',
+        },
+        users: rows,
+      });
     },
   );
 
