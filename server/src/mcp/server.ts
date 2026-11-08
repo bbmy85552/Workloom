@@ -13,6 +13,14 @@ import {
   listReadingUsers,
 } from '../lib/readingStats.js';
 import { isValidDateString } from '../lib/dailyPicks.js';
+import {
+  assertWorkspaceWritable,
+  canWriteHtml,
+  extractUpload,
+  loadHtmlPreview,
+  previewDir,
+  removePreviewDir,
+} from '../lib/htmlPreview.js';
 import type { LiveTimelineLink, SessionAgg } from '../lib/readingStats.js';
 import { env } from '../env.js';
 
@@ -89,6 +97,54 @@ function buildHtmlFileUrl(preview: { id: string; entryPath: string }, token: str
     .join('/');
   const url = `${BASE_URL}/api/html-previews/${preview.id}/files/${path}`;
   return token ? `${url}?token=${token}` : url;
+}
+
+function htmlBaseNameNoExt(name: string): string {
+  const base = name.split('/').pop() ?? name;
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+
+// HTML 的链接拼法：有有效仅查看分享链接就带 token，否则 fileUrl 不带 token、shareUrl 为 null 并加 note
+//（与 html_get 无链接分支一致；上传不自动创建分享链接）。
+async function htmlLinks(preview: { id: string; entryPath: string }) {
+  const link = await findLatestViewShareLink('html', preview.id);
+  const token = link ? link.token : null;
+  return {
+    fileUrl: buildHtmlFileUrl(preview, token),
+    shareUrl: token ? `${BASE_URL}/share/${token}` : null,
+    ...(token
+      ? {}
+      : {
+          note: '该 HTML 暂无有效的仅查看分享链接，fileUrl 未带 token；文件接口也接受登录态，但 MCP 调用方一般没有登录态，请先在站内为它创建一个仅查看分享链接。',
+        }),
+  };
+}
+
+// 照网页上传路由（POST /api/html-previews）的工作区解析规则：parentId 优先（取父文件夹所在工作区），
+// 其次 workspaceId，再按 workspaceKind（PUBLIC 取公共库，PRIVATE 取调用者最早的私人空间）；
+// 三者都不传时默认调用者私人空间根目录，与 docs_create 的默认值一致。
+async function resolveHtmlUploadWorkspace(
+  user: AuthedUser,
+  opts: { parentId?: string; workspaceId?: string; workspaceKind?: 'PUBLIC' | 'PRIVATE' },
+) {
+  if (opts.parentId) {
+    const parent = await prisma.document.findUnique({
+      where: { id: opts.parentId },
+      include: { workspace: true },
+    });
+    if (!parent || parent.deletedAt || parent.isArchived) {
+      throw new HttpError(400, '父文件夹不存在', 'BAD_PARENT');
+    }
+    return { ws: parent.workspace, parentId: parent.id };
+  }
+  if (opts.workspaceId) {
+    const ws = await prisma.workspace.findUnique({ where: { id: opts.workspaceId } });
+    if (!ws) throw new HttpError(404, '工作区不存在', 'NOT_FOUND');
+    return { ws, parentId: null as string | null };
+  }
+  const ws = await findTargetWorkspace(user.id, opts.workspaceKind ?? 'PRIVATE');
+  return { ws, parentId: null as string | null };
 }
 
 async function findTargetWorkspace(userId: string, kind: 'PRIVATE' | 'PUBLIC') {
@@ -771,6 +827,145 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
           : {
               note: '该 HTML 暂无有效的仅查看分享链接，fileUrl 未带 token；文件接口也接受登录态，但 MCP 调用方一般没有登录态，请先在站内为它创建一个仅查看分享链接。',
             }),
+      });
+    },
+  );
+
+  server.registerTool(
+    'html_upload',
+    {
+      title: 'Upload HTML Preview',
+      description:
+        'Upload an HTML page as a new HTML preview in the knowledge base: either a single .html/.htm file (html = content string) or a .zip bundle (zipBase64 = base64-encoded zip, unpacked with the same rules as web upload). Open to all logged-in users. Returns metadata and links only (fileUrl, shareUrl, appUrl), never the HTML source. Does not create a share link.',
+      inputSchema: {
+        title: z.string().trim().min(1).max(100).optional(),
+        html: z.string().min(1).max(5_000_000).optional(),
+        zipBase64: z.string().min(1).max(14_000_000).optional(),
+        filename: z.string().trim().min(1).max(200).optional(),
+        entryPath: z.string().trim().min(1).max(500).optional(),
+        parentId: z.string().min(1).max(100).optional(),
+        workspaceId: z.string().optional(),
+        workspaceKind: z.enum(['PUBLIC', 'PRIVATE']).optional(),
+      },
+    },
+    async ({ title, html, zipBase64, filename, entryPath, parentId, workspaceId, workspaceKind }) => {
+      const hasHtml = typeof html === 'string' && html.length > 0;
+      const hasZip = typeof zipBase64 === 'string' && zipBase64.length > 0;
+      if (hasHtml === hasZip) {
+        throw new HttpError(
+          400,
+          'html 与 zipBase64 二选一：传一个 .html/.htm 内容字符串，或传一个 .zip 的 base64',
+          'BAD_INPUT',
+        );
+      }
+      if (hasZip && !/^[A-Za-z0-9+/=\r\n]+$/.test(zipBase64 as string)) {
+        throw new HttpError(400, 'zipBase64 不是有效的 base64', 'BAD_INPUT');
+      }
+      const name = (filename ?? (hasZip ? 'upload.zip' : 'index.html')).trim();
+      const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+      if (hasHtml && ext !== '.html' && ext !== '.htm') {
+        throw new HttpError(400, '传 html 内容时文件名须以 .html 或 .htm 结尾', 'BAD_TYPE');
+      }
+      if (hasZip && ext !== '.zip') {
+        throw new HttpError(400, '传 zipBase64 时文件名须以 .zip 结尾', 'BAD_TYPE');
+      }
+      const buffer = hasZip
+        ? Buffer.from(zipBase64 as string, 'base64')
+        : Buffer.from(html as string, 'utf-8');
+      if (buffer.length === 0) throw new HttpError(400, '上传内容为空', 'EMPTY_UPLOAD');
+      const { ws, parentId: resolvedParentId } = await resolveHtmlUploadWorkspace(user, {
+        parentId,
+        workspaceId,
+        workspaceKind,
+      });
+      assertWorkspaceWritable(user, ws);
+      const preview = await prisma.htmlPreview.create({
+        data: {
+          workspaceId: ws.id,
+          parentId: resolvedParentId,
+          createdById: user.id,
+          title: title || htmlBaseNameNoExt(name),
+          entryPath: '',
+        },
+      });
+      try {
+        const result = await extractUpload(buffer, name, previewDir(preview.id), entryPath);
+        const updated = await prisma.htmlPreview.update({
+          where: { id: preview.id },
+          data: { entryPath: result.entryPath, fileCount: result.files.length, totalSize: result.totalSize },
+        });
+        const links = await htmlLinks(updated);
+        return jsonContent({
+          id: updated.id,
+          title: updated.title,
+          entryPath: updated.entryPath,
+          fileCount: updated.fileCount,
+          totalSize: updated.totalSize,
+          workspaceKind: ws.kind,
+          appUrl: `${BASE_URL}/app/html/${updated.id}`,
+          ...links,
+        });
+      } catch (err) {
+        await prisma.htmlPreview.delete({ where: { id: preview.id } }).catch(() => undefined);
+        await removePreviewDir(preview.id);
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    'html_delete',
+    {
+      title: 'Delete HTML Preview',
+      description:
+        'Move an HTML preview to trash (soft delete, restorable from the web trash). Only the creator or an admin can delete.',
+      inputSchema: { id: z.string() },
+    },
+    async ({ id }) => {
+      const preview = await loadHtmlPreview(id);
+      if (!canWriteHtml(user, preview)) throw new HttpError(403, '无权限', 'FORBIDDEN');
+      if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+      const deleted = await prisma.htmlPreview.update({
+        where: { id: preview.id },
+        data: { deletedAt: new Date(), deletedById: user.id },
+      });
+      return jsonContent({
+        ok: true,
+        id: deleted.id,
+        title: deleted.title,
+        deletedAt: deleted.deletedAt?.toISOString() ?? null,
+      });
+    },
+  );
+
+  server.registerTool(
+    'html_update',
+    {
+      title: 'Rename HTML Preview',
+      description:
+        'Rename an HTML preview (title only; the HTML content is never changed here — to change content, delete it and upload a new one). Only the creator or an admin can rename.',
+      inputSchema: {
+        id: z.string(),
+        title: z.string().trim().min(1).max(100),
+      },
+    },
+    async ({ id, title }) => {
+      const preview = await loadHtmlPreview(id);
+      if (!canWriteHtml(user, preview)) throw new HttpError(403, '无权限', 'FORBIDDEN');
+      if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+      const updated = await prisma.htmlPreview.update({
+        where: { id: preview.id },
+        data: { title },
+      });
+      const links = await htmlLinks(updated);
+      return jsonContent({
+        id: updated.id,
+        title: updated.title,
+        entryPath: updated.entryPath,
+        fileCount: updated.fileCount,
+        totalSize: updated.totalSize,
+        appUrl: `${BASE_URL}/app/html/${updated.id}`,
+        ...links,
       });
     },
   );
