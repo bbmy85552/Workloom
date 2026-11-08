@@ -40,6 +40,9 @@ export async function resolveReadingTitles(
 
 export interface LiveTimelineLink {
   id: string;
+  pickId: string;
+  featuredDate: string;
+  sortOrder: number;
   token: string;
   resourceType: string;
   resourceId: string;
@@ -57,8 +60,9 @@ export interface LiveTimelineLink {
 // 未撤销、role 必须是 view、未过期、资源仍可解析（有标题）。
 export async function getLiveTimelineLinks(now: Date = new Date()): Promise<LiveTimelineLink[]> {
   const picks = await prisma.dailyPick.findMany({
-    select: { shareLinkId: true },
+    select: { id: true, shareLinkId: true, featuredDate: true, sortOrder: true },
   });
+  const pickByLinkId = new Map(picks.map((p) => [p.shareLinkId, p]));
   const pickLinkIds = [...new Set(picks.map((p) => p.shareLinkId))];
   if (pickLinkIds.length === 0) return [];
   const links = await prisma.shareLink.findMany({
@@ -76,6 +80,9 @@ export async function getLiveTimelineLinks(now: Date = new Date()): Promise<Live
     .filter((l) => titles.has(`${l.resourceType}:${l.resourceId}`))
     .map((l) => ({
       id: l.id,
+      pickId: pickByLinkId.get(l.id)!.id,
+      featuredDate: pickByLinkId.get(l.id)!.featuredDate,
+      sortOrder: pickByLinkId.get(l.id)!.sortOrder,
       token: l.token,
       resourceType: l.resourceType,
       resourceId: l.resourceId,

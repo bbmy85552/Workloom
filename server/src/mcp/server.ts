@@ -12,6 +12,7 @@ import {
   getLiveTimelineLinks,
   listReadingUsers,
 } from '../lib/readingStats.js';
+import { isValidDateString } from '../lib/dailyPicks.js';
 import type { LiveTimelineLink, SessionAgg } from '../lib/readingStats.js';
 import { env } from '../env.js';
 
@@ -771,6 +772,75 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
               note: '该 HTML 暂无有效的仅查看分享链接，fileUrl 未带 token；文件接口也接受登录态，但 MCP 调用方一般没有登录态，请先在站内为它创建一个仅查看分享链接。',
             }),
       });
+    },
+  );
+
+  server.registerTool(
+    'daily_picks_list',
+    {
+      title: 'Daily Picks Timeline',
+      description:
+        'List articles featured on the Daily Picks timeline (docs, tables and HTML previews). Open to all logged-in users. Returns metadata and links only, never body content.',
+      inputSchema: {
+        date: z.string().trim().min(1).max(10).optional(),
+        q: z.string().trim().min(1).max(200).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+      },
+    },
+    async ({ date, q, limit }) => {
+      if (date && !isValidDateString(date)) {
+        return jsonContent({
+          error: 'BAD_DATE',
+          message: '日期格式应为 YYYY-MM-DD（北京时间）',
+        });
+      }
+      const links = await getLiveTimelineLinks();
+      const sorted = [...links].sort((a, b) => {
+        if (a.featuredDate !== b.featuredDate) return b.featuredDate.localeCompare(a.featuredDate);
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      });
+      let filtered = sorted;
+      if (date) filtered = filtered.filter((l) => l.featuredDate === date);
+      if (q) {
+        const keyword = q.toLowerCase();
+        filtered = filtered.filter((l) => l.title.toLowerCase().includes(keyword));
+      }
+      const total = filtered.length;
+      const page = filtered.slice(0, limit ?? 50);
+      const htmlIds = [...new Set(page.filter((l) => l.resourceType === 'html').map((l) => l.resourceId))];
+      const entryById = new Map<string, string>();
+      if (htmlIds.length > 0) {
+        const previews = await prisma.htmlPreview.findMany({
+          where: { id: { in: htmlIds }, deletedAt: null },
+          select: { id: true, entryPath: true },
+        });
+        for (const p of previews) entryById.set(p.id, p.entryPath);
+      }
+      const appPath = (resourceType: string, resourceId: string) =>
+        resourceType === 'doc'
+          ? `/app/docs/${resourceId}`
+          : resourceType === 'table'
+            ? `/app/tables/${resourceId}`
+            : `/app/html/${resourceId}`;
+      const picks = page.map((l) => {
+        const shareUrl = `${BASE_URL}/share/${l.token}`;
+        const entryPath = entryById.get(l.resourceId);
+        return {
+          pickId: l.pickId,
+          date: l.featuredDate,
+          title: l.title,
+          resourceType: l.resourceType,
+          linkId: l.id,
+          fileUrl:
+            l.resourceType === 'html' && entryPath
+              ? buildHtmlFileUrl({ id: l.resourceId, entryPath }, l.token)
+              : null,
+          shareUrl,
+          appUrl: `${BASE_URL}${appPath(l.resourceType, l.resourceId)}`,
+        };
+      });
+      return jsonContent({ total, picks });
     },
   );
 
