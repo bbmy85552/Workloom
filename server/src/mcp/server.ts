@@ -13,6 +13,7 @@ import {
   listReadingUsers,
 } from '../lib/readingStats.js';
 import type { LiveTimelineLink, SessionAgg } from '../lib/readingStats.js';
+import { env } from '../env.js';
 
 const FOLDER_CONTENT = '<div data-jianji-type="folder"></div>';
 const FIELD_TYPES = [
@@ -53,6 +54,40 @@ function isFolderContent(contentJson: string | null | undefined) {
 
 function withFolderFlag<T extends { contentJson?: string | null }>(doc: T) {
   return { ...doc, isFolder: isFolderContent(doc.contentJson) };
+}
+
+// MCP 一律只给链接、不返回正文/HTML 源码：文档与 HTML 的正文都不进模型上下文。
+const BASE_URL = env.APP_URL.replace(/\/+$/, '');
+
+function stripDocBody<T extends { contentJson?: string | null }>(doc: T): Omit<T, 'contentJson'> {
+  const copy = { ...doc };
+  delete copy.contentJson;
+  return copy;
+}
+
+// 取某资源现有有效的仅查看分享链接（未撤销、未过期；多条取最新的一条）。
+async function findLatestViewShareLink(resourceType: string, resourceId: string) {
+  const now = new Date();
+  return prisma.shareLink.findFirst({
+    where: {
+      resourceType,
+      resourceId,
+      role: 'view',
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+// 照分享页 SharePage.tsx 拼 iframe src 的方式拼 HTML 文件地址。
+function buildHtmlFileUrl(preview: { id: string; entryPath: string }, token: string | null) {
+  const path = preview.entryPath
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  const url = `${BASE_URL}/api/html-previews/${preview.id}/files/${path}`;
+  return token ? `${url}?token=${token}` : url;
 }
 
 async function findTargetWorkspace(userId: string, kind: 'PRIVATE' | 'PUBLIC') {
@@ -121,7 +156,7 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     'docs_list',
     {
       title: 'List Documents',
-      description: 'List accessible documents in docs-platform.',
+      description: 'List accessible documents in docs-platform. Returns metadata only, never document bodies.',
       inputSchema: {
         scope: z.enum(['mine', 'public', 'shared', 'all']).default('all'),
         q: z.string().max(120).optional(),
@@ -178,7 +213,8 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
         .flat()
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
         .slice(0, limit)
-        .map(withFolderFlag);
+        .map(withFolderFlag)
+        .map(stripDocBody);
       return jsonContent({ docs });
     },
   );
@@ -187,12 +223,22 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
     'docs_get',
     {
       title: 'Get Document',
-      description: 'Get one document by id.',
+      description: 'Get one document by id. Returns metadata and links only, never the document body.',
       inputSchema: { id: z.string() },
     },
     async ({ id }) => {
       const { doc, access } = await loadDocWithAccess(user, id);
-      return jsonContent({ doc: withFolderFlag(doc), access });
+      const link = await findLatestViewShareLink('doc', id);
+      const shareUrl = link ? `${BASE_URL}/share/${link.token}` : null;
+      const links = { shareUrl, appUrl: `${BASE_URL}/app/docs/${id}` };
+      return jsonContent({
+        doc: stripDocBody(withFolderFlag(doc)),
+        links,
+        access,
+        ...(shareUrl
+          ? {}
+          : { note: '暂无有效的仅查看分享链接，请登录后打开站内地址查看。' }),
+      });
     },
   );
 
@@ -634,6 +680,96 @@ export function createDocsPlatformMcpServer(user: AuthedUser) {
           note: '只算每日精选时间线里实际放出的文章（已撤销、过期或未进时间线的链接不计）',
         },
         users: rows,
+      });
+    },
+  );
+
+  server.registerTool(
+    'html_list',
+    {
+      title: 'List HTML Previews',
+      description:
+        'Admin only. List HTML previews in the knowledge base. Returns metadata only (id, title, entryPath, createdAt), never the HTML source.',
+      inputSchema: {
+        q: z.string().max(120).optional(),
+      },
+    },
+    async ({ q }) => {
+      assertReadingAdmin(user);
+      const previews = await prisma.htmlPreview.findMany({
+        where: { deletedAt: null, ...(q ? { title: { contains: q } } : {}) },
+        select: { id: true, title: true, entryPath: true, createdAt: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+      return jsonContent({
+        htmlPreviews: previews.map((p) => ({
+          id: p.id,
+          title: p.title,
+          entryPath: p.entryPath,
+          createdAt: p.createdAt.toISOString(),
+        })),
+      });
+    },
+  );
+
+  server.registerTool(
+    'html_get',
+    {
+      title: 'Get HTML Preview',
+      description:
+        'Admin only. Get one HTML preview by id or title keyword. Returns metadata and links only (fileUrl, shareUrl), never the HTML source.',
+      inputSchema: {
+        html: z.string().trim().min(1).max(200),
+      },
+    },
+    async ({ html }) => {
+      assertReadingAdmin(user);
+      const previews = await prisma.htmlPreview.findMany({
+        where: { deletedAt: null },
+        select: { id: true, title: true, entryPath: true, createdAt: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+      const keyword = html.toLowerCase();
+      let target: (typeof previews)[number] | undefined = previews.find((p) => p.id === html);
+      if (!target) {
+        const exact = previews.filter((p) => p.title.trim().toLowerCase() === keyword);
+        if (exact.length === 1) {
+          target = exact[0];
+        } else {
+          const matched = exact.length > 1 ? exact : previews.filter((p) => p.title.toLowerCase().includes(keyword));
+          if (matched.length === 0) {
+            return jsonContent({
+              error: 'NOT_FOUND',
+              message: `没有找到标题包含「${html}」的 HTML 预览`,
+              htmlPreviews: previews.map((p) => ({ linkId: p.id, title: p.title })),
+            });
+          }
+          if (matched.length > 1) {
+            return jsonContent({
+              error: 'AMBIGUOUS',
+              message: `标题包含「${html}」的 HTML 预览有 ${matched.length} 篇，请用 id 指定一篇`,
+              candidates: matched.map((p) => ({ linkId: p.id, title: p.title })),
+            });
+          }
+          target = matched[0];
+        }
+      }
+      if (!target) throw new HttpError(404, '没有找到对应的 HTML 预览', 'NOT_FOUND');
+      const link = await findLatestViewShareLink('html', target.id);
+      const token = link ? link.token : null;
+      const fileUrl = buildHtmlFileUrl(target, token);
+      const shareUrl = token ? `${BASE_URL}/share/${token}` : null;
+      return jsonContent({
+        id: target.id,
+        title: target.title,
+        entryPath: target.entryPath,
+        fileUrl,
+        shareUrl,
+        ...(token
+          ? {}
+          : {
+              note: '该 HTML 暂无有效的仅查看分享链接，fileUrl 未带 token；文件接口也接受登录态，但 MCP 调用方一般没有登录态，请先在站内为它创建一个仅查看分享链接。',
+            }),
       });
     },
   );
