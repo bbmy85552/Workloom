@@ -192,6 +192,8 @@ docRouter.get(
             contentJson: true,
             tags: true,
             updatedAt: true,
+            isPinned: true,
+            pinnedAt: true,
             createdById: true,
             workspace: { select: { id: true, name: true, kind: true, ownerId: true } },
             createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -208,7 +210,7 @@ docRouter.get(
 
     const mineDocs = await prisma.document.findMany({
       where: { workspaceId: { in: wsIds }, isArchived: false, deletedAt: null },
-      select: { id: true, title: true, parentId: true, workspaceId: true, contentJson: true, tags: true, updatedAt: true, createdById: true },
+      select: { id: true, title: true, parentId: true, workspaceId: true, contentJson: true, tags: true, updatedAt: true, isPinned: true, pinnedAt: true, createdById: true },
       orderBy: { updatedAt: 'desc' },
     });
     const publicDocs = publicWs
@@ -222,6 +224,8 @@ docRouter.get(
             contentJson: true,
             tags: true,
             updatedAt: true,
+            isPinned: true,
+            pinnedAt: true,
             createdById: true,
             createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
           },
@@ -243,6 +247,8 @@ docRouter.get(
         contentJson: true,
         tags: true,
         updatedAt: true,
+        isPinned: true,
+        pinnedAt: true,
         createdById: true,
         workspace: { select: { id: true, name: true, ownerId: true } },
         createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -268,6 +274,8 @@ docRouter.get(
         parentId: true,
         workspaceId: true,
         updatedAt: true,
+        isPinned: true,
+        pinnedAt: true,
         createdById: true,
         createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
@@ -282,6 +290,8 @@ docRouter.get(
             parentId: true,
             workspaceId: true,
             updatedAt: true,
+            isPinned: true,
+            pinnedAt: true,
             createdById: true,
             createdBy: { select: { id: true, name: true, email: true, avatarUrl: true } },
           },
@@ -289,11 +299,20 @@ docRouter.get(
         })
       : [];
     const toHtmlNode = (p: (typeof mineHtml)[number]) => ({ ...p, kind: 'html' as const, isFolder: false });
-    const byUpdatedDesc = (a: { updatedAt: Date }, b: { updatedAt: Date }) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    const mine = [...annotateFav(mineDocs), ...mineHtml.map(toHtmlNode)].sort(byUpdatedDesc);
-    const publicDocsWithFav = [...annotateFav(publicDocs), ...publicHtml.map(toHtmlNode)].sort(byUpdatedDesc);
-    const shared = annotateFav(sharedDocs);
+    // 置顶优先：置顶的排前面（按置顶时间倒序），其余仍按更新时间倒序
+    const byPinThenUpdatedDesc = (
+      a: { isPinned?: boolean | null; pinnedAt?: Date | string | null; updatedAt: Date | string },
+      b: { isPinned?: boolean | null; pinnedAt?: Date | string | null; updatedAt: Date | string },
+    ) => {
+      const ap = a.isPinned ? 1 : 0;
+      const bp = b.isPinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      if (ap === 1) return new Date(b.pinnedAt ?? 0).getTime() - new Date(a.pinnedAt ?? 0).getTime();
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    };
+    const mine = [...annotateFav(mineDocs), ...mineHtml.map(toHtmlNode)].sort(byPinThenUpdatedDesc);
+    const publicDocsWithFav = [...annotateFav(publicDocs), ...publicHtml.map(toHtmlNode)].sort(byPinThenUpdatedDesc);
+    const shared = annotateFav(sharedDocs).sort(byPinThenUpdatedDesc);
     const documentCount = (list: Array<{ isFolder?: boolean }>) =>
       list.filter((item) => !item.isFolder).length;
 
@@ -335,6 +354,37 @@ docRouter.delete(
         where: { userId_documentId: { userId: req.user!.id, documentId: req.params.id } },
       })
       .catch(() => undefined);
+    res.json({ ok: true });
+  }),
+);
+
+docRouter.post(
+  '/:id/pin',
+  asyncHandler(async (req, res) => {
+    const { doc, access } = await loadDocWithAccess(req.user!, req.params.id);
+    if (!access.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
+    if (isFolderContent(doc.contentJson)) throw new HttpError(400, '文件夹不能置顶', 'IS_FOLDER');
+    const childCount = await prisma.document.count({
+      where: { parentId: doc.id, isArchived: false, deletedAt: null },
+    });
+    if (childCount > 0) throw new HttpError(400, '文件夹不能置顶', 'IS_FOLDER');
+    await prisma.document.update({
+      where: { id: doc.id },
+      data: { isPinned: true, pinnedAt: new Date() },
+    });
+    res.json({ ok: true });
+  }),
+);
+
+docRouter.delete(
+  '/:id/pin',
+  asyncHandler(async (req, res) => {
+    const { doc, access } = await loadDocWithAccess(req.user!, req.params.id);
+    if (!access.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
+    await prisma.document.update({
+      where: { id: doc.id },
+      data: { isPinned: false, pinnedAt: null },
+    });
     res.json({ ok: true });
   }),
 );

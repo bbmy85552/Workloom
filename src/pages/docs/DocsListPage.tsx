@@ -14,6 +14,7 @@ import {
   Lock,
   Users,
   Star,
+  Pin,
   LayoutGrid,
   ListTree,
   Loader2,
@@ -559,6 +560,21 @@ export function DocsListPage() {
     }
   };
 
+  const togglePin = async (doc: DocNode) => {
+    try {
+      if (doc.kind === 'html') {
+        if (doc.isPinned) await api.delete(`/html-previews/${doc.id}/pin`);
+        else await api.post(`/html-previews/${doc.id}/pin`);
+      } else {
+        if (doc.isPinned) await api.delete(`/docs/${doc.id}/pin`);
+        else await api.post(`/docs/${doc.id}/pin`);
+      }
+      await load();
+    } catch (err) {
+      showToast(asApiError(err).error, 'error');
+    }
+  };
+
   const isAdmin = user?.role === 'ADMIN';
   const canManage = (doc: DocNode) => {
     if (doc.kind === 'html') {
@@ -1017,6 +1033,22 @@ export function DocsListPage() {
                 )}
                 {(canManage(doc) || canEditCurrentTab) && (
                   <>
+                    {!doc.isFolder && (doc.kind !== 'html' || canManage(doc)) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void togglePin(doc);
+                        }}
+                        className={`p-1.5 rounded-md ${
+                          doc.isPinned
+                            ? 'text-liquid-indigo bg-liquid-indigo/10 hover:bg-liquid-indigo/20'
+                            : 'text-text-secondary hover:text-liquid-indigo hover:bg-liquid-indigo/5'
+                        }`}
+                        title={doc.isPinned ? '取消置顶' : '置顶'}
+                      >
+                        <Pin size={14} fill={doc.isPinned ? 'currentColor' : 'none'} />
+                      </button>
+                    )}
                     {(tab === 'public' || tab === 'mine') && (
                       <button
                         onClick={(e) => {
@@ -1090,9 +1122,18 @@ export function DocsListPage() {
                   </>
                 )}
               </div>
-              {doc.isFavorite && (
-                <span className="absolute top-2 left-2 text-amber-500 group-hover:hidden">
-                  <Star size={14} fill="currentColor" />
+              {(doc.isPinned || doc.isFavorite) && (
+                <span className="absolute top-2 left-2 flex gap-1 group-hover:hidden">
+                  {doc.isPinned && (
+                    <span className="text-liquid-indigo">
+                      <Pin size={14} fill="currentColor" />
+                    </span>
+                  )}
+                  {doc.isFavorite && (
+                    <span className="text-amber-500">
+                      <Star size={14} fill="currentColor" />
+                    </span>
+                  )}
                 </span>
               )}
             </li>

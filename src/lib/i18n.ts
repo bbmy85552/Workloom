@@ -390,6 +390,8 @@ const exactEn: Record<string, string> = {
   待保存: 'Unsaved',
   收藏: 'Favorite',
   取消收藏: 'Remove Favorite',
+  置顶: 'Pin to top',
+  取消置顶: 'Unpin',
   打印: 'Print',
   '打印 / 另存为 PDF': 'Print / Save as PDF',
   删除文档: 'Delete Document',

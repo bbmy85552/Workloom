@@ -196,6 +196,34 @@ htmlPreviewRouter.patch(
   }),
 );
 
+htmlPreviewRouter.post(
+  '/:id/pin',
+  asyncHandler(async (req, res) => {
+    const preview = await loadHtmlPreview(req.params.id);
+    if (!canWriteHtml(req.user!, preview)) throw new HttpError(403, '无权限', 'FORBIDDEN');
+    if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+    await prisma.htmlPreview.update({
+      where: { id: preview.id },
+      data: { isPinned: true, pinnedAt: new Date() },
+    });
+    res.json({ ok: true });
+  }),
+);
+
+htmlPreviewRouter.delete(
+  '/:id/pin',
+  asyncHandler(async (req, res) => {
+    const preview = await loadHtmlPreview(req.params.id);
+    if (!canWriteHtml(req.user!, preview)) throw new HttpError(403, '无权限', 'FORBIDDEN');
+    if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
+    await prisma.htmlPreview.update({
+      where: { id: preview.id },
+      data: { isPinned: false, pinnedAt: null },
+    });
+    res.json({ ok: true });
+  }),
+);
+
 htmlPreviewRouter.get(
   '/trash',
   asyncHandler(async (req, res) => {

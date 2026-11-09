@@ -9,6 +9,7 @@ import {
   Download,
   Upload,
   Star,
+  Pin,
   MessageSquare,
   CheckCircle2,
   AlertTriangle,
@@ -94,6 +95,7 @@ export function DocDetailPage() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'dirty' | 'conflict'>('saved');
   const [conflict, setConflict] = useState<DocConflict | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
@@ -307,6 +309,7 @@ export function DocDetailPage() {
         setConflict(null);
         setConflictOpen(false);
         setIsFavorite(!!treeRes.data.favorites.find((f) => f.id === id));
+        setIsPinned(!!docRes.data.doc.isPinned);
         const families = [
           ...fontsRes.data.list.map((f) => f.family),
           ...userFontsRes.data.list.map((f) => f.family),
@@ -694,6 +697,25 @@ export function DocDetailPage() {
               >
                 <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
               </button>
+              {canWrite && (
+                <button
+                  onClick={async () => {
+                    try {
+                      if (isPinned) await api.delete(`/docs/${doc.id}/pin`);
+                      else await api.post(`/docs/${doc.id}/pin`);
+                      setIsPinned(!isPinned);
+                    } catch (err) {
+                      showToast(asApiError(err).error, 'error');
+                    }
+                  }}
+                  title={isPinned ? '取消置顶' : '置顶'}
+                  className={`p-2 rounded-lg ${
+                    isPinned ? 'text-liquid-indigo bg-liquid-indigo/10' : 'text-text-secondary hover:bg-black/5'
+                  }`}
+                >
+                  <Pin size={14} fill={isPinned ? 'currentColor' : 'none'} />
+                </button>
+              )}
               <div className="relative">
                 <button
                   onClick={() => setExportOpen((v) => !v)}

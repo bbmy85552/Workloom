@@ -28,6 +28,8 @@ export interface DocNode {
   createdBy?: UserSearchItem;
   workspace?: { id: string; name: string; ownerId: string; kind?: WorkspaceKind };
   isFavorite?: boolean;
+  isPinned?: boolean;
+  pinnedAt?: string;
   favoritedAt?: string;
   isFolder?: boolean;
   kind?: 'doc' | 'html';

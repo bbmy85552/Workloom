@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, ChevronDown, Copy, FileText, Folder, Globe, Plus, Pencil, Trash2, FolderInput, FolderOutput } from 'lucide-react';
+import { ChevronRight, ChevronDown, Copy, FileText, Folder, Globe, Plus, Pencil, Trash2, FolderInput, FolderOutput, Pin } from 'lucide-react';
 import type { DocNode } from '../../lib/types';
 
 export interface TreeNode extends DocNode {
@@ -37,7 +37,13 @@ export function buildTree(list: DocNode[]): TreeNode[] {
     }
   });
   const sortRec = (arr: TreeNode[]) => {
-    arr.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    arr.sort((a, b) => {
+      const ap = a.isPinned ? 1 : 0;
+      const bp = b.isPinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      if (ap === 1) return new Date(b.pinnedAt ?? 0).getTime() - new Date(a.pinnedAt ?? 0).getTime();
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
     arr.forEach((n) => sortRec(n.children));
   };
   sortRec(roots);
@@ -185,6 +191,9 @@ export function DocTree({
               <Globe size={13} className="shrink-0 opacity-70" />
             ) : (
               <FileText size={13} className="shrink-0 opacity-70" />
+            )}
+            {node.isPinned && !node.isFolder && (
+              <Pin size={13} className="shrink-0 text-liquid-indigo" fill="currentColor" />
             )}
             <span className="truncate">{node.title}</span>
             {node.kind !== 'html' && node.tags && node.tags.length > 0 && (
