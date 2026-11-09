@@ -370,7 +370,7 @@ docRouter.post(
     if (childCount > 0) throw new HttpError(400, '文件夹不能置顶', 'IS_FOLDER');
     await prisma.document.update({
       where: { id: doc.id },
-      data: { isPinned: true, pinnedAt: new Date() },
+      data: { isPinned: true, pinnedAt: new Date(), updatedAt: doc.updatedAt },
     });
     res.json({ ok: true });
   }),
@@ -383,7 +383,7 @@ docRouter.delete(
     if (!access.canWrite) throw new HttpError(403, '只读权限', 'READONLY');
     await prisma.document.update({
       where: { id: doc.id },
-      data: { isPinned: false, pinnedAt: null },
+      data: { isPinned: false, pinnedAt: null, updatedAt: doc.updatedAt },
     });
     res.json({ ok: true });
   }),

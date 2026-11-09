@@ -204,7 +204,7 @@ htmlPreviewRouter.post(
     if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
     await prisma.htmlPreview.update({
       where: { id: preview.id },
-      data: { isPinned: true, pinnedAt: new Date() },
+      data: { isPinned: true, pinnedAt: new Date(), updatedAt: preview.updatedAt },
     });
     res.json({ ok: true });
   }),
@@ -218,7 +218,7 @@ htmlPreviewRouter.delete(
     if (preview.deletedAt) throw new HttpError(404, 'HTML 预览不存在', 'NOT_FOUND');
     await prisma.htmlPreview.update({
       where: { id: preview.id },
-      data: { isPinned: false, pinnedAt: null },
+      data: { isPinned: false, pinnedAt: null, updatedAt: preview.updatedAt },
     });
     res.json({ ok: true });
   }),
